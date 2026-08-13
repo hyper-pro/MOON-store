@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MOON Server - Admin Panel | Manage Users & Gems</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+</head>
+<body>
+
+  <!-- Navigation Header -->
+  <header>
+    <div class="container navbar">
+      <a href="index.html" class="nav-brand">
+        <img src="assets/logo.png" alt="MOON Logo" class="brand-logo">
+        <span class="brand-text">ADMIN PANEL</span>
+      </a>
+
+      <div class="nav-links">
+        <a href="index.html" class="nav-btn btn-outline">
+          🛒 Back to Store
+        </a>
+        <div id="admin-user-badge" class="user-profile-badge" style="display: none;">
+          <span class="badge-admin">ADMIN SESSION</span>
+          <span id="admin-user-email" style="font-size: 0.85rem; font-weight: 600; color: var(--color-cyan);">PIN Verified</span>
+          <button id="lock-admin-btn" class="nav-btn btn-outline btn-sm" style="border-color: var(--color-danger); color: var(--color-danger); padding: 4px 10px; font-size: 0.75rem;" title="Lock Admin Panel">
+            🔒 Lock
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Access Denied State (Hidden by default) -->
+  <div id="access-denied" class="container" style="display: none; padding: 100px 0; text-align: center;">
+    <div class="hero-card" style="border-color: var(--color-danger);">
+      <div style="font-size: 4rem; color: var(--color-danger); margin-bottom: 16px;">⛔</div>
+      <h1 class="hero-title" style="color: var(--color-danger);">ACCESS DENIED</h1>
+      <p class="hero-subtitle">
+        You do not have administrator permissions to access this page. Please login with an admin account on the store.
+      </p>
+      <a href="index.html" class="nav-btn btn-primary" style="display: inline-block;">Return to Main Store</a>
+    </div>
+  </div>
+
+  <!-- PIN Protection Screen (Hidden by default) -->
+  <div id="pin-protection" class="container" style="display: none; padding: 100px 0; text-align: center; max-width: 480px;">
+    <div class="hero-card" style="border-color: var(--color-purple); box-shadow: 0 0 30px var(--color-purple-glow); background: rgba(15, 20, 32, 0.9);">
+      <div style="font-size: 4.5rem; margin-bottom: 16px; animation: pulse 2s infinite alternate;">🔒</div>
+      <h1 class="hero-title" style="color: #fff; font-size: 1.8rem; letter-spacing: 2px;">SECURITY GATEWAY</h1>
+      <p class="hero-subtitle" style="font-size: 0.95rem; margin-bottom: 24px; color: var(--text-muted);">
+        Enter the 4-digit Administrator PIN code to access the control panel.
+      </p>
+      <form id="admin-pin-form">
+        <div class="form-group">
+          <input type="password" id="admin-pin-input" class="form-input" placeholder="••••" required maxlength="4" style="text-align: center; font-size: 2.2rem; letter-spacing: 12px; font-family: monospace; max-width: 180px; margin: 0 auto 20px; border-color: var(--border-purple);">
+        </div>
+        <button type="submit" class="nav-btn btn-gold" style="width: 100%; justify-content: center; padding: 14px; font-size: 1.1rem;">
+          ⚡ Authorize
+        </button>
+      </form>
+      <a href="index.html" class="nav-btn btn-outline" style="display: inline-block; margin-top: 16px; width: 100%; justify-content: center; border-color: rgba(255,255,255,0.15); color: var(--text-muted);">
+        Return to Store
+      </a>
+    </div>
+  </div>
+
+  <!-- Admin Main Dashboard Container -->
+  <main id="admin-dashboard" class="container" style="display: none; padding-top: 40px; padding-bottom: 60px;">
+    
+    <div class="admin-header">
+      <div class="admin-title-row">
+        <div>
+          <h1 class="hero-title" style="font-size: 2.2rem; text-align: left; margin: 0;">SERVER MANAGEMENT</h1>
+          <p style="color: var(--text-muted); margin-top: 4px;">Credit user gems, manage accounts, and view purchase dispatch logs.</p>
+        </div>
+        <button id="refresh-admin-data" class="nav-btn btn-outline" style="font-size: 0.9rem;">
+          🔄 Refresh Data
+        </button>
+      </div>
+    </div>
+
+    <div class="admin-grid">
+      
+      <!-- Card 1: Add/Set Gems Form -->
+      <div class="admin-card">
+        <h3 class="admin-card-title">💎 CREDIT / MODIFY USER GEMS</h3>
+        <form id="admin-gems-form">
+          <div class="form-group">
+            <label class="form-label" for="admin-select-user">Select User (Email / IGN)</label>
+            <select id="admin-select-user" class="form-select" required>
+              <option value="">Loading registered users...</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="admin-gems-action">Action Mode</label>
+            <select id="admin-gems-action" class="form-select">
+              <option value="add">Add Gems to Balance (+)</option>
+              <option value="remove">Remove Gems from Balance (-)</option>
+              <option value="set">Set Exact Gems Balance (=)</option>
+              <option value="reset">Reset Gems to 0 (Reset)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="admin-gems-amount">Amount of Gems</label>
+            <input type="number" id="admin-gems-amount" class="form-input" min="1" placeholder="e.g. 500" required>
+          </div>
+
+          <button type="submit" class="nav-btn btn-gold" style="width: 100%; justify-content: center; padding: 12px; margin-top: 10px;">
+            ⚡ Update User Gems
+          </button>
+        </form>
+      </div>
+
+      <!-- Card 2: Quick Stats -->
+      <div class="admin-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+        <h3 class="admin-card-title">📊 STORE QUICK OVERVIEW</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div style="background: rgba(0, 240, 255, 0.05); border: 1px solid var(--border-cyan); padding: 20px; border-radius: 12px; text-align: center;">
+            <div style="font-size: 2.2rem; font-family: var(--font-display); font-weight: 800; color: var(--color-cyan);" id="stat-total-users">0</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; margin-top: 4px;">Registered Players</div>
+          </div>
+          <div style="background: rgba(157, 78, 221, 0.05); border: 1px solid var(--border-purple); padding: 20px; border-radius: 12px; text-align: center;">
+            <div style="font-size: 2.2rem; font-family: var(--font-display); font-weight: 800; color: var(--color-purple);" id="stat-total-purchases">0</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; margin-top: 4px;">Pending Tasks</div>
+          </div>
+        </div>
+        <div style="background: rgba(0, 230, 118, 0.05); border: 1px solid rgba(0, 230, 118, 0.3); padding: 16px; border-radius: 12px; margin-top: 16px; text-align: center; display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: var(--text-muted); font-size: 0.85rem;">Completed Tasks:</span>
+          <span style="color: var(--color-green); font-weight: 800; font-size: 1.2rem;" id="stat-completed-purchases">0</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Section 3: Registered Users Table -->
+    <div class="admin-card" style="margin-bottom: 30px;">
+      <h3 class="admin-card-title">👥 REGISTERED PLAYERS DIRECTORY</h3>
+      <div class="form-group" style="margin-bottom: 20px; max-width: 400px;">
+        <input type="text" id="admin-search-users" class="form-input" placeholder="🔍 Search email, username or password..." style="border-color: rgba(255,255,255,0.15);">
+      </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Player Email</th>
+              <th>Minecraft IGN</th>
+              <th>Password</th>
+              <th>Current Gems</th>
+              <th>Role</th>
+              <th>Quick Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-table-body">
+            <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Loading players...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 4: Pending Dispatch & Purchase Tasks Table -->
+    <div class="admin-card" style="margin-bottom: 30px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+        <h3 class="admin-card-title" style="margin-bottom: 0;">⏳ RECENT PENDING DISPATCH & TASKS</h3>
+        <span class="badge-admin" style="background: rgba(255, 170, 0, 0.2); color: var(--color-gold); border: 1px solid var(--color-gold);" id="pending-count-badge">0 Pending</span>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 16px;">
+        Click the tick checkbox <span style="color: var(--color-cyan); font-weight: bold;">[☑ Mark Done]</span> to mark a transaction as processed/completed. Done tasks will automatically move to the Completed History section below.
+      </p>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="text-align: center; width: 110px;">Task Tick</th>
+              <th>Date & Time</th>
+              <th>Buyer Email</th>
+              <th>Target IGN</th>
+              <th>Item Title</th>
+              <th>Cost</th>
+              <th>Console Command</th>
+            </tr>
+          </thead>
+          <tbody id="purchases-table-body">
+            <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading pending purchase tasks...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 5: Completed Transactions History Table & Extraction -->
+    <div class="admin-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 18px;">
+        <div>
+          <h3 class="admin-card-title" style="margin-bottom: 4px;">✅ COMPLETED TRANSACTIONS HISTORY</h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem;">History of processed & completed dispatches. Extract or search the list anytime.</p>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <input type="text" id="admin-search-completed" class="form-input" placeholder="🔍 Search completed..." style="max-width: 220px; padding: 8px 12px; font-size: 0.85rem;">
+          <button id="export-completed-csv-btn" class="nav-btn btn-gold" style="padding: 8px 16px; font-size: 0.85rem;">
+            📥 Extract / Export CSV
+          </button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="text-align: center; width: 100px;">Task Tick</th>
+              <th>Date & Time</th>
+              <th>Buyer Email</th>
+              <th>Target IGN</th>
+              <th>Item Title</th>
+              <th>Cost</th>
+              <th>Console Command</th>
+              <th>Completed At</th>
+              <th style="text-align: center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="completed-table-body">
+            <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No completed tasks yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <div id="toast-container"></div>
+
+  <!-- Firebase SDK Compat Scripts (Double-Click Compatible) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
