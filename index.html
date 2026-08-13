@@ -266,14 +266,34 @@
 
   <!-- Success Modal -->
   <div id="success-modal" class="modal-overlay">
-    <div class="modal-card" style="text-align: center;">
+    <div class="modal-card" style="text-align: center; max-width: 480px;">
       <button class="modal-close">&times;</button>
-      <div style="font-size: 3.5rem; color: var(--color-green); margin-bottom: 12px;">🎉</div>
-      <h3 class="modal-title" style="color: var(--color-green);">PURCHASE SUCCESSFUL!</h3>
-      <p id="success-message-text" class="modal-subtitle" style="margin-bottom: 24px;">
-        Items will be granted in-game shortly by an Admin.
+      <div style="font-size: 3.5rem; color: var(--color-green); margin-bottom: 8px;">🎉</div>
+      <h3 class="modal-title" style="color: var(--color-green); font-size: 1.6rem; letter-spacing: 1px;">PURCHASE SUCCESSFUL!</h3>
+      <p id="success-message-text" class="modal-subtitle" style="margin-bottom: 20px; font-size: 0.95rem; color: var(--text-muted);">
+        Successfully purchased item.
       </p>
-      <button class="nav-btn btn-primary modal-close-action" style="margin: 0 auto; width: 180px;">
+
+      <!-- Console Command Copy Box -->
+      <div style="background: rgba(0, 210, 255, 0.05); border: 1px dashed var(--border-cyan); padding: 16px; border-radius: 12px; margin-bottom: 20px; text-align: left;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: var(--color-cyan); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; display: flex; justify-content: space-between; align-items: center;">
+          <span>📟 Console Command:</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">Click to copy</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.4); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+          <code id="success-command-code" style="font-family: monospace; font-size: 0.95rem; color: #fff; flex: 1; word-break: break-all;">command here</code>
+          <button id="success-copy-cmd-btn" class="nav-btn btn-gold btn-sm" style="padding: 6px 12px; font-size: 0.8rem; flex-shrink: 0;">
+            📋 Copy
+          </button>
+        </div>
+      </div>
+
+      <!-- Discord Channel Button -->
+      <a href="https://discord.com/channels/1343939109051306088/1537300897951125605" target="_blank" rel="noopener noreferrer" class="nav-btn btn-primary" style="width: 100%; justify-content: center; padding: 14px; font-size: 0.95rem; background: linear-gradient(135deg, #5865F2, #4752C4); color: #fff; border: none; box-shadow: 0 0 20px rgba(88, 101, 242, 0.4); margin-bottom: 12px; text-decoration: none;">
+        💬 Open Discord Console Channel & Paste ↗
+      </a>
+
+      <button class="nav-btn btn-outline modal-close-action" style="margin: 0 auto; width: 100%; justify-content: center; border-color: rgba(255,255,255,0.15); color: var(--text-muted);">
         Awesome!
       </button>
     </div>

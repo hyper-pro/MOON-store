@@ -32,6 +32,10 @@ let allUsersCache = [];
 let allPendingPurchases = [];
 let allCompletedPurchases = [];
 
+// Real-time listener unsubscribers
+let usersUnsubscribe = null;
+let purchasesUnsubscribe = null;
+
 // Toast Helper
 function showToast(message, type = "info") {
   const container = document.getElementById("toast-container");
@@ -125,25 +129,26 @@ adminPinForm?.addEventListener("submit", (e) => {
   }
 });
 
-// Load All Admin Data
-async function loadAdminDashboardData() {
-  await Promise.all([
-    fetchUsers(),
-    fetchPurchases()
-  ]);
+// Start all real-time listeners
+function loadAdminDashboardData() {
+  startUsersRealtimeListener();
+  startPurchasesRealtimeListener();
 }
 
-// Refresh Data Listener
+// Refresh Data Button (re-subscribes listeners)
 document.getElementById("refresh-admin-data")?.addEventListener("click", () => {
+  // Unsubscribe and resubscribe to force a fresh pull
+  if (usersUnsubscribe) usersUnsubscribe();
+  if (purchasesUnsubscribe) purchasesUnsubscribe();
   loadAdminDashboardData();
-  showToast("Dashboard data refreshed!", "info");
+  showToast("Live sync active — dashboard refreshed!", "info");
 });
 
-// Fetch Registered Users
-async function fetchUsers() {
-  try {
-    const snapshot = await db.collection("users").get();
-    
+// Real-time Listener: Registered Users (auto-updates on add/delete from any source)
+function startUsersRealtimeListener() {
+  if (usersUnsubscribe) usersUnsubscribe(); // clean up old listener
+
+  usersUnsubscribe = db.collection("users").onSnapshot((snapshot) => {
     allUsersCache = [];
     if (adminSelectUser) {
       adminSelectUser.innerHTML = `<option value="">-- Select a User --</option>`;
@@ -163,11 +168,10 @@ async function fetchUsers() {
 
     if (statTotalUsers) statTotalUsers.innerText = snapshot.size;
     triggerSearchFilter();
-
-  } catch (err) {
-    console.error("Error fetching users:", err);
-    showToast("Failed to fetch users list.", "error");
-  }
+  }, (err) => {
+    console.error("Error in users real-time listener:", err);
+    showToast("Failed to sync users directory.", "error");
+  });
 }
 
 // Render Users Directory
@@ -237,11 +241,11 @@ adminGemsAction?.addEventListener("change", (e) => {
   }
 });
 
-// Fetch Purchases & Separate into Pending Tasks vs Completed Tasks
-async function fetchPurchases() {
-  try {
-    const snapshot = await db.collection("purchases").orderBy("createdAt", "desc").limit(100).get();
+// Real-time Listener: Purchases (auto-updates on new purchases, task completions, deletions)
+function startPurchasesRealtimeListener() {
+  if (purchasesUnsubscribe) purchasesUnsubscribe(); // clean up old listener
 
+  purchasesUnsubscribe = db.collection("purchases").orderBy("createdAt", "desc").limit(100).onSnapshot((snapshot) => {
     allPendingPurchases = [];
     allCompletedPurchases = [];
 
@@ -261,11 +265,10 @@ async function fetchPurchases() {
     if (statTotalPurchases) statTotalPurchases.innerText = allPendingPurchases.length;
     if (statCompletedPurchases) statCompletedPurchases.innerText = allCompletedPurchases.length;
     if (pendingCountBadge) pendingCountBadge.innerText = `${allPendingPurchases.length} Pending`;
-
-  } catch (err) {
-    console.error("Error fetching purchases:", err);
-    showToast("Failed to fetch purchase tasks.", "error");
-  }
+  }, (err) => {
+    console.error("Error in purchases real-time listener:", err);
+    showToast("Failed to sync purchase tasks.", "error");
+  });
 }
 
 // Render Pending Dispatch Tasks Table (with Checkbox Tick button)

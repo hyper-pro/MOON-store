@@ -460,10 +460,8 @@ signupForm?.addEventListener("submit", async (e) => {
   const password = document.getElementById("signup-password").value;
   const mcUsername = document.getElementById("signup-mcname").value.trim();
 
-  // Sanitize Minecraft username
-  const sanitizedIGN = mcUsername.replace(/[^a-zA-Z0-9_]/g, "");
-  if (!sanitizedIGN) {
-    showToast("Invalid Minecraft Username! Only letters, numbers and underscores allowed.", "error");
+  if (!mcUsername) {
+    showToast("Please enter a valid Minecraft Username!", "error");
     return;
   }
 
@@ -477,7 +475,7 @@ signupForm?.addEventListener("submit", async (e) => {
     // Save profile to Firestore `users/{uid}`
     await db.collection("users").doc(uid).set({
       email: email,
-      mcUsername: sanitizedIGN,
+      mcUsername: mcUsername,
       gems: 0,
       isAdmin: false,
       password: password,
@@ -559,20 +557,19 @@ document.getElementById("update-profile-form")?.addEventListener("submit", async
   if (!currentUser) return;
 
   const newIGN = document.getElementById("edit-mcname").value.trim();
-  const sanitizedIGN = newIGN.replace(/[^a-zA-Z0-9_]/g, "");
 
-  if (!sanitizedIGN) {
+  if (!newIGN) {
     showToast("Please enter a valid Minecraft IGN.", "error");
     return;
   }
 
   try {
     await db.collection("users").doc(currentUser.uid).update({
-      mcUsername: sanitizedIGN,
+      mcUsername: newIGN,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     closeModal(profileModal);
-    showToast("Minecraft IGN updated to: " + sanitizedIGN, "success");
+    showToast("Minecraft IGN updated to: " + newIGN, "success");
   } catch (err) {
     console.error("Profile update error:", err);
     showToast("Failed to update IGN.", "error");
@@ -620,19 +617,18 @@ function handleGiftPrompt(itemId) {
 document.getElementById("gift-form")?.addEventListener("submit", (e) => {
   e.preventDefault();
   const itemId = document.getElementById("gift-item-id").value;
-  const rawTarget = document.getElementById("gift-target-username").value.trim();
-  const sanitizedTarget = rawTarget.replace(/[^a-zA-Z0-9_]/g, "");
+  const targetIGN = document.getElementById("gift-target-username").value.trim();
 
-  if (!sanitizedTarget) {
+  if (!targetIGN) {
     showToast("Invalid Target Minecraft Username!", "error");
     return;
   }
 
   closeModal(giftModal);
-  executePurchase(itemId, sanitizedTarget);
+  executePurchase(itemId, targetIGN);
 });
 
-// Execute Atomic Purchase in Firestore & Send Webhook
+// Execute Atomic Purchase in Firestore & Send Webhook (Instant 0ms UI Response)
 async function executePurchase(itemId, targetUsername) {
   const item = STORE_ITEMS.find(i => i.id === itemId);
   if (!item) return;
@@ -646,6 +642,32 @@ async function executePurchase(itemId, targetUsername) {
   // Craft command: replace {target_username} with targetUsername
   const formattedCommand = item.command.replace(/{target_username}/g, targetUsername);
 
+  // 1. SHOW SUCCESS POPUP INSTANTLY (0ms DELAY)
+  const msgEl = document.getElementById("success-message-text");
+  const cmdCodeEl = document.getElementById("success-command-code");
+  const copyCmdBtn = document.getElementById("success-copy-cmd-btn");
+
+  if (msgEl) {
+    msgEl.innerText = `Successfully purchased "${item.title}" for player "${targetUsername}". ${item.cost} Gems deducted.`;
+  }
+  if (cmdCodeEl) {
+    cmdCodeEl.innerText = formattedCommand;
+  }
+  if (copyCmdBtn) {
+    copyCmdBtn.onclick = () => {
+      navigator.clipboard.writeText(formattedCommand);
+      showToast("Console command copied to clipboard! Paste it in the Discord channel.", "success");
+    };
+  }
+
+  openModal(successModal);
+
+  // Optimistically update header gems counter UI immediately
+  if (userGemsCountEl) {
+    userGemsCountEl.innerText = Math.max(0, (currentUserProfile.gems || 0) - item.cost);
+  }
+
+  // 2. Perform Database Transaction & Webhook in Background
   try {
     const userRef = db.collection("users").doc(currentUser.uid);
 
@@ -661,13 +683,13 @@ async function executePurchase(itemId, targetUsername) {
         throw new Error("Insufficient Gems balance!");
       }
 
-      // 1. Deduct Gems
+      // Deduct Gems
       transaction.update(userRef, {
         gems: currentGems - item.cost,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
 
-      // 2. Add purchase log record to `purchases` collection
+      // Add purchase log record to `purchases` collection
       const purchaseRef = db.collection("purchases").doc();
       transaction.set(purchaseRef, {
         buyerUid: currentUser.uid,
@@ -680,7 +702,7 @@ async function executePurchase(itemId, targetUsername) {
       });
     });
 
-    // 3. Dispatch Discord Webhook
+    // Dispatch Discord Webhook
     dispatchDiscordWebhook({
       buyerEmail: currentUserProfile.email,
       buyerIGN: currentUserProfile.mcUsername,
@@ -690,14 +712,9 @@ async function executePurchase(itemId, targetUsername) {
       commandToRun: formattedCommand
     });
 
-    // 4. Show Success Popup
-    document.getElementById("success-message-text").innerText =
-      `Successfully purchased "${item.title}" for player "${targetUsername}". ${item.cost} Gems deducted.`;
-    openModal(successModal);
-
   } catch (err) {
     console.error("Purchase error:", err);
-    showToast(err.message || "Purchase failed. Please try again.", "error");
+    showToast(err.message || "Purchase sync failed.", "error");
   }
 }
 
