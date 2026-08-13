@@ -75,9 +75,14 @@
           <h1 class="hero-title" style="font-size: 2.2rem; text-align: left; margin: 0;">SERVER MANAGEMENT</h1>
           <p style="color: var(--text-muted); margin-top: 4px;">Credit user gems, manage accounts, and view purchase dispatch logs.</p>
         </div>
-        <button id="refresh-admin-data" class="nav-btn btn-outline" style="font-size: 0.9rem;">
-          🔄 Refresh Data
-        </button>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <a href="https://discord.com/channels/1343939109051306088/1537300897951125605" target="_blank" rel="noopener noreferrer" class="nav-btn btn-primary" style="font-size: 0.85rem; background: linear-gradient(135deg, #5865F2, #4752C4); color: #fff; border: none; box-shadow: 0 0 15px rgba(88, 101, 242, 0.4); text-decoration: none;">
+            💬 Discord Console Channel ↗
+          </a>
+          <button id="refresh-admin-data" class="nav-btn btn-outline" style="font-size: 0.9rem;">
+            🔄 Refresh Data
+          </button>
+        </div>
       </div>
     </div>
 
@@ -198,14 +203,20 @@
           <p style="color: var(--text-muted); font-size: 0.85rem;">History of processed & completed dispatches. Extract or search the list anytime.</p>
         </div>
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-          <input type="text" id="admin-search-completed" class="form-input" placeholder="🔍 Search completed..." style="max-width: 220px; padding: 8px 12px; font-size: 0.85rem;">
+          <input type="text" id="admin-search-completed" class="form-input" placeholder="🔍 Search completed..." style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">
+          <button id="toggle-completed-list-btn" class="nav-btn btn-outline" style="padding: 8px 14px; font-size: 0.85rem; border-color: var(--color-cyan); color: var(--color-cyan);">
+            👁️ Hide / Show History
+          </button>
           <button id="export-completed-csv-btn" class="nav-btn btn-gold" style="padding: 8px 16px; font-size: 0.85rem;">
             📥 Extract / Export CSV
+          </button>
+          <button id="delete-all-completed-btn" class="nav-btn btn-outline" style="padding: 8px 14px; font-size: 0.85rem; border-color: var(--color-danger); color: var(--color-danger);">
+            🗑️ Delete All History
           </button>
         </div>
       </div>
 
-      <div class="table-responsive">
+      <div id="completed-table-wrapper" class="table-responsive">
         <table class="data-table">
           <thead>
             <tr>

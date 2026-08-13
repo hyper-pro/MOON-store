@@ -420,6 +420,57 @@ adminSearchCompleted?.addEventListener("input", () => {
   renderCompletedPurchasesTable(filtered);
 });
 
+// Toggle Hide / Expand Completed History List
+const toggleCompletedListBtn = document.getElementById("toggle-completed-list-btn");
+const completedTableWrapper = document.getElementById("completed-table-wrapper");
+
+toggleCompletedListBtn?.addEventListener("click", () => {
+  if (!completedTableWrapper) return;
+  if (completedTableWrapper.style.display === "none") {
+    completedTableWrapper.style.display = "block";
+    toggleCompletedListBtn.innerHTML = "👁️ Hide History List";
+    showToast("Completed history list shown.", "info");
+  } else {
+    completedTableWrapper.style.display = "none";
+    toggleCompletedListBtn.innerHTML = "👁️ Show History List";
+    showToast("Completed history list hidden.", "info");
+  }
+});
+
+// Delete All Completed History from Database
+const deleteAllCompletedBtn = document.getElementById("delete-all-completed-btn");
+
+deleteAllCompletedBtn?.addEventListener("click", async () => {
+  if (allCompletedPurchases.length === 0) {
+    showToast("No completed transactions to delete.", "error");
+    return;
+  }
+
+  const confirmDelete = confirm(`⚠️ DANGER: Are you sure you want to PERMANENTLY DELETE ALL ${allCompletedPurchases.length} completed transaction records from the database? This action CANNOT be undone!`);
+  if (!confirmDelete) return;
+
+  try {
+    deleteAllCompletedBtn.disabled = true;
+    deleteAllCompletedBtn.innerText = "Deleting...";
+
+    const batch = db.batch();
+    allCompletedPurchases.forEach(item => {
+      const docRef = db.collection("purchases").doc(item.id);
+      batch.delete(docRef);
+    });
+
+    await batch.commit();
+    showToast(`Successfully deleted ${allCompletedPurchases.length} completed transaction records from database! 🗑️`, "success");
+    loadAdminDashboardData();
+  } catch (err) {
+    console.error("Error deleting completed transactions:", err);
+    showToast("Failed to delete completed transaction records.", "error");
+  } finally {
+    deleteAllCompletedBtn.disabled = false;
+    deleteAllCompletedBtn.innerText = "🗑️ Delete All History";
+  }
+});
+
 // Extract Completed Transactions to CSV File
 exportCompletedCsvBtn?.addEventListener("click", () => {
   if (allCompletedPurchases.length === 0) {
