@@ -196,7 +196,8 @@ function renderUsersTable(usersList) {
       <td>
         <button class="nav-btn btn-outline btn-sm quick-add-btn" data-uid="${u.uid}" data-action="add" data-amount="100" style="border-color: var(--color-green); color: var(--color-green); padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">+100</button>
         <button class="nav-btn btn-outline btn-sm quick-add-btn" data-uid="${u.uid}" data-action="remove" data-amount="100" style="border-color: var(--color-danger); color: var(--color-danger); padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">-100</button>
-        <button class="nav-btn btn-outline btn-sm quick-add-btn" data-uid="${u.uid}" data-action="reset" style="border-color: var(--text-muted); color: var(--text-muted); padding: 4px 8px; font-size: 0.75rem;">Reset</button>
+        <button class="nav-btn btn-outline btn-sm quick-add-btn" data-uid="${u.uid}" data-action="reset" style="border-color: var(--text-muted); color: var(--text-muted); padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Reset</button>
+        <button class="nav-btn btn-sm delete-user-btn" data-uid="${u.uid}" data-email="${escapeHtml(u.email || '')}" data-username="${escapeHtml(u.mcUsername || '')}" style="border-color: var(--color-danger); color: #fff; background-color: var(--color-danger); padding: 4px 8px; font-size: 0.75rem;">Delete</button>
       </td>
     `;
     usersTableBody.appendChild(tr);
@@ -208,6 +209,15 @@ function renderUsersTable(usersList) {
       const action = e.currentTarget.getAttribute("data-action");
       const amount = parseInt(e.currentTarget.getAttribute("data-amount") || "0", 10);
       grantGemsToUser(uid, action, amount);
+    });
+  });
+
+  document.querySelectorAll(".delete-user-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const uid = e.currentTarget.getAttribute("data-uid");
+      const email = e.currentTarget.getAttribute("data-email");
+      const username = e.currentTarget.getAttribute("data-username");
+      deleteUserAccount(uid, email, username);
     });
   });
 }
@@ -551,6 +561,26 @@ async function grantGemsToUser(uid, action, amount) {
   } catch (err) {
     console.error("Error updating gems:", err);
     showToast("Failed to update user Gems.", "error");
+  }
+}
+
+// Delete User Account from Firestore database
+async function deleteUserAccount(uid, email, username) {
+  if (!uid) {
+    showToast("Invalid user specified.", "error");
+    return;
+  }
+
+  const confirmDelete = confirm(`⚠️ DANGER: Are you sure you want to PERMANENTLY DELETE player "${username || 'No IGN'}" (${email})?\n\nThis will remove their profile from the database. When this player next opens the store, their Authentication account will also be cleaned up.`);
+  if (!confirmDelete) return;
+
+  try {
+    await db.collection("users").doc(uid).delete();
+    showToast(`Successfully deleted user ${email} from Firestore! 🗑️`, "success");
+    loadAdminDashboardData();
+  } catch (err) {
+    console.error("Error deleting user:", err);
+    showToast("Failed to delete user account from Firestore.", "error");
   }
 }
 

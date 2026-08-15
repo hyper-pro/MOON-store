@@ -185,6 +185,8 @@ let currentUser = null;
 let currentUserProfile = null;
 let profileUnsubscribe = null;
 let currentCategoryFilter = "all";
+let isRegistering = false;
+let hasCheckedAutoLogin = false;
 
 // DOM Elements
 const authLoggedOutEl = document.getElementById("auth-logged-out");
@@ -432,16 +434,38 @@ auth.onAuthStateChanged((user) => {
   if (profileUnsubscribe) profileUnsubscribe();
 
   if (user) {
+    hasCheckedAutoLogin = true; // Mark checked if user loads as authenticated
     authLoggedOutEl.style.display = "none";
     authLoggedInEl.style.display = "flex";
 
     // Listen live to Firestore user profile `users/{uid}`
     const userRef = db.collection("users").doc(user.uid);
-    profileUnsubscribe = userRef.onSnapshot((snapshot) => {
+    profileUnsubscribe = userRef.onSnapshot(async (snapshot) => {
       if (snapshot.exists) {
         currentUserProfile = snapshot.data();
         userGemsCountEl.innerText = currentUserProfile.gems ?? 0;
         headerUserIgnEl.innerText = currentUserProfile.mcUsername || "Player";
+      } else {
+        // If profile doesn't exist, check if we are registering or if it's a newly created account
+        const timeSinceCreation = user.metadata ? (Date.now() - new Date(user.metadata.creationTime).getTime()) : 999999;
+        
+        if (!isRegistering && timeSinceCreation > 15000) {
+          console.warn("User document deleted from Firestore. Cleaning up Auth account.");
+          localStorage.removeItem('moon_saved_email');
+          localStorage.removeItem('moon_saved_password');
+          
+          try {
+            const userObj = auth.currentUser;
+            if (userObj) {
+              await userObj.delete();
+              showToast("Your account has been deleted by an administrator.", "error");
+            }
+          } catch (err) {
+            console.warn("Could not delete Auth account directly. Signing out.", err);
+            await auth.signOut();
+            showToast("Your account has been deleted by an administrator.", "error");
+          }
+        }
       }
     });
 
@@ -449,6 +473,21 @@ auth.onAuthStateChanged((user) => {
     currentUserProfile = null;
     authLoggedOutEl.style.display = "flex";
     authLoggedInEl.style.display = "none";
+
+    // Auto-login check on first load if not authenticated
+    if (!hasCheckedAutoLogin) {
+      hasCheckedAutoLogin = true;
+      const savedEmail = localStorage.getItem('moon_saved_email');
+      const savedPassword = localStorage.getItem('moon_saved_password');
+      if (savedEmail && savedPassword) {
+        console.log("Auto-login credentials found. Attempting auto-login...");
+        auth.signInWithEmailAndPassword(savedEmail, savedPassword).catch(err => {
+          console.error("Auto-login failed:", err);
+          localStorage.removeItem('moon_saved_email');
+          localStorage.removeItem('moon_saved_password');
+        });
+      }
+    }
   }
 });
 
@@ -465,6 +504,7 @@ signupForm?.addEventListener("submit", async (e) => {
     return;
   }
 
+  isRegistering = true;
   submitBtn.disabled = true;
   submitBtn.innerText = "Creating Account...";
 
@@ -482,13 +522,18 @@ signupForm?.addEventListener("submit", async (e) => {
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
+    // Save credentials to localStorage for auto-login
+    localStorage.setItem('moon_saved_email', email);
+    localStorage.setItem('moon_saved_password', password);
+
     closeModal(authModal);
-    signupForm.reset();
+    setTimeout(() => signupForm.reset(), 1000); // Delay reset to let browser save password
     showToast("Account created successfully! Welcome to MOON Store.", "success");
   } catch (err) {
     console.error("Sign up error:", err);
     showToast(getAuthErrorMessage(err), "error");
   } finally {
+    isRegistering = false;
     submitBtn.disabled = false;
     submitBtn.innerText = "Create Account";
   }
@@ -506,8 +551,13 @@ loginForm?.addEventListener("submit", async (e) => {
 
   try {
     await auth.signInWithEmailAndPassword(email, password);
+    
+    // Save credentials to localStorage for auto-login
+    localStorage.setItem('moon_saved_email', email);
+    localStorage.setItem('moon_saved_password', password);
+
     closeModal(authModal);
-    loginForm.reset();
+    setTimeout(() => loginForm.reset(), 1000); // Delay reset to let browser save password
     showToast("Welcome back! Logged in successfully.", "success");
   } catch (err) {
     console.error("Login error:", err);
@@ -544,6 +594,10 @@ resetPasswordForm?.addEventListener("submit", async (e) => {
 // Logout Handler
 document.getElementById("logout-btn")?.addEventListener("click", async () => {
   try {
+    // Clear saved auto-login credentials
+    localStorage.removeItem('moon_saved_email');
+    localStorage.removeItem('moon_saved_password');
+    
     await auth.signOut();
     showToast("Logged out.", "info");
   } catch (err) {
