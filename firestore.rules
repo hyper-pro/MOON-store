@@ -11,6 +11,12 @@ service cloud.firestore {
     match /purchases/{purchaseId} {
       allow read, write: if true;
     }
+
+    // Rules for gift_cards collection (allow read/write for store & admin)
+    match /gift_cards/{cardId} {
+      allow read, write: if true;
+    }
   }
 }
+
 

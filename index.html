@@ -79,6 +79,7 @@
           <button class="tab-btn" data-category="coins">Server Coins</button>
           <button class="tab-btn" data-category="ranks">Rank Books</button>
           <button class="tab-btn" data-category="crates">Crate Keys</button>
+          <button class="tab-btn" data-category="giftcards">🎁 Gift Cards</button>
         </div>
       </div>
 
@@ -86,7 +87,77 @@
       <div id="items-container" class="items-grid">
         <!-- Rendered dynamically via app.js -->
       </div>
+
+      <!-- Gift Cards Container -->
+      <div id="gift-cards-container" class="gift-cards-wrapper" style="display: none;">
+        
+        <!-- Tier Information Banner -->
+        <div style="grid-column: 1/-1;" class="tier-info-banner">
+          <span class="tier-badge bronze">🥉 Bronze: 1-10 Gems</span>
+          <span class="tier-badge silver">🥈 Silver: 11-50 Gems</span>
+          <span class="tier-badge diamond">💎 Diamond: 51-100 Gems</span>
+          <span class="tier-badge platinum">👑 Platinum: >100 Gems</span>
+        </div>
+
+        <!-- Create Gift Card Box -->
+        <div class="gift-card-box">
+          <div class="gift-card-box-header">
+            <div class="gift-card-box-icon">🎁</div>
+            <div>
+              <h3 class="gift-card-box-title">CREATE GIFT CARD</h3>
+              <p class="gift-card-box-subtitle">Convert your Gems into a 5-digit single-use Gift Card code</p>
+            </div>
+          </div>
+
+          <form id="create-gift-card-form">
+            <div class="form-group">
+              <label class="form-label" for="create-card-gems">Gems Amount</label>
+              <input type="number" id="create-card-gems" class="form-input" min="1" placeholder="e.g. 50" required>
+            </div>
+
+            <!-- Live Tier Preview Badge -->
+            <div class="gift-card-preview" id="create-card-preview-box">
+              <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">CALCULATED GIFT CARD TIER</div>
+              <div class="gift-card-tier-preview" style="margin-top: 8px;">
+                <span id="create-card-tier-badge" class="tier-badge bronze">🥉 Bronze Tier</span>
+              </div>
+            </div>
+
+            <button type="submit" id="create-card-btn" class="nav-btn btn-primary" style="width: 100%; justify-content: center; padding: 14px; font-size: 1rem;">
+              ⚡ Create Gift Card & Deduct Gems
+            </button>
+          </form>
+        </div>
+
+        <!-- Redeem Gift Card Box -->
+        <div class="gift-card-box">
+          <div class="gift-card-box-header">
+            <div class="gift-card-box-icon" style="border-color: var(--color-gold); background: rgba(255, 215, 0, 0.08);">🔑</div>
+            <div>
+              <h3 class="gift-card-box-title" style="color: var(--color-gold);">REDEEM GIFT CARD</h3>
+              <p class="gift-card-box-subtitle">Enter a 5-digit Gift Card code to instantly claim Gems</p>
+            </div>
+          </div>
+
+          <form id="redeem-gift-card-form">
+            <div class="form-group">
+              <label class="form-label" for="redeem-card-code">5-Digit Gift Card Code</label>
+              <input type="text" id="redeem-card-code" class="form-input" placeholder="e.g. 49201" maxlength="5" pattern="[0-9]{5}" required style="font-family: monospace; font-size: 1.5rem; letter-spacing: 6px; text-align: center;">
+            </div>
+
+            <div style="background: rgba(0, 240, 255, 0.05); border: 1px dashed var(--border-cyan); border-radius: 12px; padding: 14px; margin-bottom: 20px; text-align: center; font-size: 0.85rem; color: var(--text-muted);">
+              ℹ️ Each gift card code can be redeemed <strong style="color: #fff;">ONLY ONCE</strong> by any player on the store.
+            </div>
+
+            <button type="submit" id="redeem-card-btn" class="nav-btn btn-gold" style="width: 100%; justify-content: center; padding: 14px; font-size: 1rem;">
+              🎉 Redeem Gift Card & Add Gems
+            </button>
+          </form>
+        </div>
+
+      </div>
     </section>
+
 
   </main>
 
@@ -298,6 +369,67 @@
       </button>
     </div>
   </div>
+
+  <!-- Gift Card Created Success Modal -->
+  <div id="card-created-modal" class="modal-overlay">
+    <div class="modal-card" style="text-align: center; max-width: 480px;">
+      <button class="modal-close">&times;</button>
+      <div style="font-size: 3.5rem; margin-bottom: 8px;">🎁</div>
+      <h3 class="modal-title" style="color: var(--color-cyan); font-size: 1.6rem; letter-spacing: 1px;">GIFT CARD CREATED!</h3>
+      <p class="modal-subtitle" style="margin-bottom: 16px; font-size: 0.95rem; color: var(--text-muted);">
+        Your gift card has been generated. Share this 5-digit code with anyone!
+      </p>
+
+      <div class="gift-card-preview" style="margin-bottom: 20px;">
+        <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;">YOUR 5-DIGIT GIFT CARD CODE</div>
+        <div id="created-modal-code" class="gift-card-code-display">84920</div>
+        <div style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 10px;">
+          <span id="created-modal-tier-badge" class="tier-badge bronze">🥉 Bronze Tier</span>
+          <span id="created-modal-gems-badge" style="color: var(--color-gold); font-weight: 700; font-size: 0.9rem;">💎 50 Gems</span>
+        </div>
+      </div>
+
+      <button id="copy-card-code-btn" class="nav-btn btn-gold" style="width: 100%; justify-content: center; padding: 14px; font-size: 1rem; margin-bottom: 12px;">
+        📋 Copy Code to Clipboard
+      </button>
+
+      <button class="nav-btn btn-outline modal-close-action" style="margin: 0 auto; width: 100%; justify-content: center; border-color: rgba(255,255,255,0.15); color: var(--text-muted);">
+        Close
+      </button>
+    </div>
+  </div>
+
+  <!-- Gift Card Redeemed Success Modal -->
+  <div id="card-redeemed-modal" class="modal-overlay">
+    <div class="modal-card" style="text-align: center; max-width: 480px;">
+      <button class="modal-close">&times;</button>
+      <div style="font-size: 3.5rem; margin-bottom: 8px;">🎉</div>
+      <h3 class="modal-title" style="color: var(--color-green); font-size: 1.6rem; letter-spacing: 1px;">GIFT CARD REDEEMED!</h3>
+      <p class="modal-subtitle" style="margin-bottom: 20px; font-size: 0.95rem; color: var(--text-muted);">
+        Gems have been successfully added to your account wallet!
+      </p>
+
+      <div class="bank-info-box" style="margin-bottom: 20px; text-align: left;">
+        <div class="bank-detail-item">
+          <span class="bank-detail-label">Created By Player:</span>
+          <span id="redeemed-modal-creator" class="bank-detail-val" style="color: var(--color-cyan);">PlayerName</span>
+        </div>
+        <div class="bank-detail-item">
+          <span class="bank-detail-label">Gift Card Tier:</span>
+          <span id="redeemed-modal-tier-badge" class="tier-badge bronze">🥉 Bronze Tier</span>
+        </div>
+        <div class="bank-detail-item">
+          <span class="bank-detail-label">Gems Added:</span>
+          <span id="redeemed-modal-gems" class="bank-detail-val" style="color: var(--color-gold); font-weight: 800;">+50 Gems</span>
+        </div>
+      </div>
+
+      <button class="nav-btn btn-primary modal-close-action" style="width: 100%; justify-content: center; padding: 14px; font-size: 1rem;">
+        Awesome! Continue Shopping
+      </button>
+    </div>
+  </div>
+
 
   <!-- Toast Notification Container -->
   <div id="toast-container"></div>

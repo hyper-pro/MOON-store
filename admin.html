@@ -86,10 +86,60 @@
       </div>
     </div>
 
-    <div class="admin-grid">
-      
-      <!-- Card 1: Add/Set Gems Form -->
-      <div class="admin-card">
+    <!-- Mobile Admin Tab Switcher Dropdown (Visible on Mobile/Tablet) -->
+    <div class="admin-mobile-tab-toggle">
+      <button id="admin-mobile-tab-btn" class="nav-btn btn-outline" style="width: 100%; justify-content: space-between; font-size: 0.95rem; padding: 12px 16px; border-color: var(--border-cyan); color: #fff; background: rgba(15, 23, 42, 0.8);">
+        <span id="admin-mobile-current-tab">📊 Quick Overview</span>
+        <span style="font-size: 0.8rem; color: var(--color-cyan);">▼ Switch Tab</span>
+      </button>
+      <div id="admin-mobile-tab-menu" class="admin-mobile-menu-dropdown" style="display: none;">
+        <button class="mobile-tab-item active" data-admin-tab="overview">📊 Quick Overview</button>
+        <button class="mobile-tab-item" data-admin-tab="gems">💎 Modify Gems</button>
+        <button class="mobile-tab-item" data-admin-tab="create-card">🎁 Create Gift Card</button>
+        <button class="mobile-tab-item" data-admin-tab="users">👥 Registered Players</button>
+        <button class="mobile-tab-item" data-admin-tab="pending">⏳ Pending Tasks</button>
+        <button class="mobile-tab-item" data-admin-tab="completed">✅ Completed Tasks</button>
+        <button class="mobile-tab-item" data-admin-tab="giftcards">🎁 Gift Cards Log</button>
+      </div>
+    </div>
+
+    <!-- Desktop Admin Navigation Tabs -->
+    <div class="category-tabs admin-tabs">
+      <button class="tab-btn active" data-admin-tab="overview">📊 Quick Overview</button>
+      <button class="tab-btn" data-admin-tab="gems">💎 Modify Gems</button>
+      <button class="tab-btn" data-admin-tab="create-card">🎁 Create Gift Card</button>
+      <button class="tab-btn" data-admin-tab="users">👥 Registered Players</button>
+      <button class="tab-btn" data-admin-tab="pending">⏳ Pending Tasks</button>
+      <button class="tab-btn" data-admin-tab="completed">✅ Completed Tasks</button>
+      <button class="tab-btn" data-admin-tab="giftcards">🎁 Gift Cards Log</button>
+    </div>
+
+
+
+    <!-- Tab 1: Store Quick Overview -->
+    <div id="admin-tab-overview" class="admin-tab-content active">
+      <div class="admin-card" style="margin-bottom: 30px;">
+        <h3 class="admin-card-title">📊 STORE QUICK OVERVIEW</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+          <div style="background: rgba(0, 240, 255, 0.05); border: 1px solid var(--border-cyan); padding: 20px; border-radius: 12px; text-align: center;">
+            <div style="font-size: 2.2rem; font-family: var(--font-display); font-weight: 800; color: var(--color-cyan);" id="stat-total-users">0</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; margin-top: 4px;">Registered Players</div>
+          </div>
+          <div style="background: rgba(157, 78, 221, 0.05); border: 1px solid var(--border-purple); padding: 20px; border-radius: 12px; text-align: center;">
+            <div style="font-size: 2.2rem; font-family: var(--font-display); font-weight: 800; color: var(--color-purple);" id="stat-total-purchases">0</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; margin-top: 4px;">Pending Tasks</div>
+          </div>
+          <div style="background: rgba(0, 230, 118, 0.05); border: 1px solid rgba(0, 230, 118, 0.3); padding: 20px; border-radius: 12px; text-align: center;">
+            <div style="font-size: 2.2rem; font-family: var(--font-display); font-weight: 800; color: var(--color-green);" id="stat-completed-purchases">0</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; margin-top: 4px;">Completed Tasks</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Credit / Modify Gems -->
+    <div id="admin-tab-gems" class="admin-tab-content" style="display: none;">
+      <div class="admin-card" style="max-width: 600px; margin: 0 auto 30px;">
         <h3 class="admin-card-title">💎 CREDIT / MODIFY USER GEMS</h3>
         <form id="admin-gems-form">
           <div class="form-group">
@@ -119,126 +169,178 @@
           </button>
         </form>
       </div>
+    </div>
 
-      <!-- Card 2: Quick Stats -->
-      <div class="admin-card" style="display: flex; flex-direction: column; justify-content: space-between;">
-        <h3 class="admin-card-title">📊 STORE QUICK OVERVIEW</h3>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-          <div style="background: rgba(0, 240, 255, 0.05); border: 1px solid var(--border-cyan); padding: 20px; border-radius: 12px; text-align: center;">
-            <div style="font-size: 2.2rem; font-family: var(--font-display); font-weight: 800; color: var(--color-cyan);" id="stat-total-users">0</div>
-            <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; margin-top: 4px;">Registered Players</div>
+    <!-- Tab 3: Admin Create Custom Gift Card -->
+    <div id="admin-tab-create-card" class="admin-tab-content" style="display: none;">
+      <div class="admin-card" style="max-width: 600px; margin: 0 auto 30px;">
+        <h3 class="admin-card-title">🎁 CREATE ADMIN GIFT CARD</h3>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 16px;">
+          Generate a 5-digit single-use Gift Card code of <strong>any Gems amount</strong> instantly.
+        </p>
+        <form id="admin-giftcard-form">
+          <div class="form-group">
+            <label class="form-label" for="admin-giftcard-gems">Gems Amount</label>
+            <input type="number" id="admin-giftcard-gems" class="form-input" min="1" placeholder="e.g. 250" required>
           </div>
-          <div style="background: rgba(157, 78, 221, 0.05); border: 1px solid var(--border-purple); padding: 20px; border-radius: 12px; text-align: center;">
-            <div style="font-size: 2.2rem; font-family: var(--font-display); font-weight: 800; color: var(--color-purple);" id="stat-total-purchases">0</div>
-            <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; margin-top: 4px;">Pending Tasks</div>
+
+          <div style="background: rgba(0, 240, 255, 0.05); border: 1px dashed var(--border-cyan); padding: 12px; border-radius: 10px; margin-bottom: 16px; text-align: center;">
+            <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">PREVIEW TIER: </span>
+            <span id="admin-giftcard-tier-badge" class="tier-badge bronze">🥉 Bronze Tier</span>
+          </div>
+
+          <button type="submit" class="nav-btn btn-primary" style="width: 100%; justify-content: center; padding: 12px;">
+            ⚡ Generate Admin Gift Card
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Tab 4: Registered Users Table -->
+    <div id="admin-tab-users" class="admin-tab-content" style="display: none;">
+      <div class="admin-card" style="margin-bottom: 30px;">
+        <h3 class="admin-card-title">👥 REGISTERED PLAYERS DIRECTORY</h3>
+        <div class="form-group" style="margin-bottom: 20px; max-width: 400px;">
+          <input type="text" id="admin-search-users" class="form-input" placeholder="🔍 Search email, username or password..." style="border-color: rgba(255,255,255,0.15);">
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Player Email</th>
+                <th>Minecraft IGN</th>
+                <th>Password</th>
+                <th>Current Gems</th>
+                <th>Role</th>
+                <th>Quick Actions</th>
+              </tr>
+            </thead>
+            <tbody id="users-table-body">
+              <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Loading players...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 5: Pending Tasks -->
+    <div id="admin-tab-pending" class="admin-tab-content" style="display: none;">
+      <div class="admin-card" style="margin-bottom: 30px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+          <h3 class="admin-card-title" style="margin-bottom: 0;">⏳ RECENT PENDING DISPATCH & TASKS</h3>
+          <span class="badge-admin" style="background: rgba(255, 170, 0, 0.2); color: var(--color-gold); border: 1px solid var(--color-gold);" id="pending-count-badge">0 Pending</span>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 16px;">
+          Click the tick checkbox <span style="color: var(--color-cyan); font-weight: bold;">[☑ Mark Done]</span> to mark a transaction as processed/completed. Done tasks will automatically move to the Completed History section below.
+        </p>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="text-align: center; width: 110px;">Task Tick</th>
+                <th>Date & Time</th>
+                <th>Buyer Email</th>
+                <th>Target IGN</th>
+                <th>Item Title</th>
+                <th>Cost</th>
+                <th>Console Command</th>
+              </tr>
+            </thead>
+            <tbody id="purchases-table-body">
+              <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading pending purchase tasks...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 6: Completed History -->
+    <div id="admin-tab-completed" class="admin-tab-content" style="display: none;">
+      <div class="admin-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 18px;">
+          <div>
+            <h3 class="admin-card-title" style="margin-bottom: 4px;">✅ COMPLETED TRANSACTIONS HISTORY</h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">History of processed & completed dispatches. Extract or search the list anytime.</p>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <input type="text" id="admin-search-completed" class="form-input" placeholder="🔍 Search completed..." style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">
+            <button id="toggle-completed-list-btn" class="nav-btn btn-outline" style="padding: 8px 14px; font-size: 0.85rem; border-color: var(--color-cyan); color: var(--color-cyan);">
+              👁️ Hide / Show History
+            </button>
+            <button id="export-completed-csv-btn" class="nav-btn btn-gold" style="padding: 8px 16px; font-size: 0.85rem;">
+              📥 Extract / Export CSV
+            </button>
+            <button id="delete-all-completed-btn" class="nav-btn btn-outline" style="padding: 8px 14px; font-size: 0.85rem; border-color: var(--color-danger); color: var(--color-danger);">
+              🗑️ Delete All History
+            </button>
           </div>
         </div>
-        <div style="background: rgba(0, 230, 118, 0.05); border: 1px solid rgba(0, 230, 118, 0.3); padding: 16px; border-radius: 12px; margin-top: 16px; text-align: center; display: flex; justify-content: space-between; align-items: center;">
-          <span style="color: var(--text-muted); font-size: 0.85rem;">Completed Tasks:</span>
-          <span style="color: var(--color-green); font-weight: 800; font-size: 1.2rem;" id="stat-completed-purchases">0</span>
+
+        <div id="completed-table-wrapper" class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="text-align: center; width: 100px;">Task Tick</th>
+                <th>Date & Time</th>
+                <th>Buyer Email</th>
+                <th>Target IGN</th>
+                <th>Item Title</th>
+                <th>Cost</th>
+                <th>Console Command</th>
+                <th>Completed At</th>
+                <th style="text-align: center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="completed-table-body">
+              <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No completed tasks yet.</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
-
     </div>
 
-    <!-- Section 3: Registered Users Table -->
-    <div class="admin-card" style="margin-bottom: 30px;">
-      <h3 class="admin-card-title">👥 REGISTERED PLAYERS DIRECTORY</h3>
-      <div class="form-group" style="margin-bottom: 20px; max-width: 400px;">
-        <input type="text" id="admin-search-users" class="form-input" placeholder="🔍 Search email, username or password..." style="border-color: rgba(255,255,255,0.15);">
-      </div>
-      <div class="table-responsive">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Player Email</th>
-              <th>Minecraft IGN</th>
-              <th>Password</th>
-              <th>Current Gems</th>
-              <th>Role</th>
-              <th>Quick Actions</th>
-            </tr>
-          </thead>
-          <tbody id="users-table-body">
-            <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Loading players...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Section 4: Pending Dispatch & Purchase Tasks Table -->
-    <div class="admin-card" style="margin-bottom: 30px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
-        <h3 class="admin-card-title" style="margin-bottom: 0;">⏳ RECENT PENDING DISPATCH & TASKS</h3>
-        <span class="badge-admin" style="background: rgba(255, 170, 0, 0.2); color: var(--color-gold); border: 1px solid var(--color-gold);" id="pending-count-badge">0 Pending</span>
-      </div>
-      <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 16px;">
-        Click the tick checkbox <span style="color: var(--color-cyan); font-weight: bold;">[☑ Mark Done]</span> to mark a transaction as processed/completed. Done tasks will automatically move to the Completed History section below.
-      </p>
-      <div class="table-responsive">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="text-align: center; width: 110px;">Task Tick</th>
-              <th>Date & Time</th>
-              <th>Buyer Email</th>
-              <th>Target IGN</th>
-              <th>Item Title</th>
-              <th>Cost</th>
-              <th>Console Command</th>
-            </tr>
-          </thead>
-          <tbody id="purchases-table-body">
-            <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading pending purchase tasks...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Section 5: Completed Transactions History Table & Extraction -->
-    <div class="admin-card">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 18px;">
-        <div>
-          <h3 class="admin-card-title" style="margin-bottom: 4px;">✅ COMPLETED TRANSACTIONS HISTORY</h3>
-          <p style="color: var(--text-muted); font-size: 0.85rem;">History of processed & completed dispatches. Extract or search the list anytime.</p>
+    <!-- Tab 7: Gift Cards Monitoring & History Directory -->
+    <div id="admin-tab-giftcards" class="admin-tab-content" style="display: none;">
+      <div class="admin-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 18px;">
+          <div>
+            <h3 class="admin-card-title" style="margin-bottom: 4px;">🎁 GIFT CARDS MONITORING & HISTORY</h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">Monitor all created gift cards, track redemptions, and delete records directly from database.</p>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <input type="text" id="admin-search-giftcards" class="form-input" placeholder="🔍 Search code or user..." style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">
+            <button id="delete-all-giftcards-btn" class="nav-btn btn-outline" style="padding: 8px 14px; font-size: 0.85rem; border-color: var(--color-danger); color: var(--color-danger);">
+              🗑️ Delete All Gift Cards History
+            </button>
+          </div>
         </div>
-        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-          <input type="text" id="admin-search-completed" class="form-input" placeholder="🔍 Search completed..." style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">
-          <button id="toggle-completed-list-btn" class="nav-btn btn-outline" style="padding: 8px 14px; font-size: 0.85rem; border-color: var(--color-cyan); color: var(--color-cyan);">
-            👁️ Hide / Show History
-          </button>
-          <button id="export-completed-csv-btn" class="nav-btn btn-gold" style="padding: 8px 16px; font-size: 0.85rem;">
-            📥 Extract / Export CSV
-          </button>
-          <button id="delete-all-completed-btn" class="nav-btn btn-outline" style="padding: 8px 14px; font-size: 0.85rem; border-color: var(--color-danger); color: var(--color-danger);">
-            🗑️ Delete All History
-          </button>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>5-Digit Code</th>
+                <th>Gems</th>
+                <th>Tier Level</th>
+                <th>Creator (IGN / Email)</th>
+                <th>Redemption Status</th>
+                <th>Redeemed By</th>
+                <th>Created At</th>
+                <th>Redeemed At</th>
+                <th style="text-align: center;">Database Actions</th>
+              </tr>
+            </thead>
+            <tbody id="giftcards-table-body">
+              <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Loading gift cards directory...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
-
-      <div id="completed-table-wrapper" class="table-responsive">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="text-align: center; width: 100px;">Task Tick</th>
-              <th>Date & Time</th>
-              <th>Buyer Email</th>
-              <th>Target IGN</th>
-              <th>Item Title</th>
-              <th>Cost</th>
-              <th>Console Command</th>
-              <th>Completed At</th>
-              <th style="text-align: center;">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="completed-table-body">
-            <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No completed tasks yet.</td></tr>
-          </tbody>
-        </table>
-      </div>
     </div>
+
 
   </main>
+
 
   <div id="toast-container"></div>
 

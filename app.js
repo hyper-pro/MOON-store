@@ -314,9 +314,21 @@ document.querySelectorAll(".category-tabs .tab-btn[data-category]").forEach(btn 
     document.querySelectorAll(".category-tabs .tab-btn[data-category]").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     currentCategoryFilter = btn.getAttribute("data-category") || "all";
-    renderStoreItems();
+    
+    const itemsContainerEl = document.getElementById("items-container");
+    const giftCardsContainerEl = document.getElementById("gift-cards-container");
+
+    if (currentCategoryFilter === "giftcards") {
+      if (itemsContainerEl) itemsContainerEl.style.display = "none";
+      if (giftCardsContainerEl) giftCardsContainerEl.style.display = "grid";
+    } else {
+      if (itemsContainerEl) itemsContainerEl.style.display = "grid";
+      if (giftCardsContainerEl) giftCardsContainerEl.style.display = "none";
+      renderStoreItems();
+    }
   });
 });
+
 
 // Firebase Auth Error Code Formatter
 function getAuthErrorMessage(error) {
@@ -838,5 +850,244 @@ async function dispatchDiscordWebhook(data) {
   }
 }
 
+// ==========================================================================
+// Gift Card System Logic (Tier Evaluation, Creation, & Redemption)
+// ==========================================================================
+
+// Gift Card Tier Level Evaluator
+// Bronze: 1-10 Gems | Silver: 11-50 Gems | Diamond: 51-100 Gems | Platinum: >100 Gems
+function getGiftCardTier(gems) {
+  const amount = parseInt(gems, 10) || 0;
+  if (amount >= 1 && amount <= 10) {
+    return { name: "Bronze", key: "bronze", icon: "🥉" };
+  } else if (amount >= 11 && amount <= 50) {
+    return { name: "Silver", key: "silver", icon: "🥈" };
+  } else if (amount >= 51 && amount <= 100) {
+    return { name: "Diamond", key: "diamond", icon: "💎" };
+  } else if (amount > 100) {
+    return { name: "Platinum", key: "platinum", icon: "👑" };
+  }
+  return { name: "Bronze", key: "bronze", icon: "🥉" };
+}
+
+// 5-Digit Random Numeric Code Generator
+function generate5DigitCode() {
+  return Math.floor(10000 + Math.random() * 90000).toString();
+}
+
+// Live Tier Preview Listener on Create Form
+const createCardGemsInput = document.getElementById("create-card-gems");
+const createCardTierBadge = document.getElementById("create-card-tier-badge");
+
+createCardGemsInput?.addEventListener("input", () => {
+  const gems = parseInt(createCardGemsInput.value, 10) || 0;
+  const tier = getGiftCardTier(gems);
+  if (createCardTierBadge) {
+    createCardTierBadge.className = `tier-badge ${tier.key}`;
+    createCardTierBadge.innerHTML = `${tier.icon} ${tier.name} Tier`;
+  }
+});
+
+// Create Gift Card Form Submission Handler
+document.getElementById("create-gift-card-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!currentUser || !currentUserProfile) {
+    openModal(authModal);
+    showToast("Please login to create a gift card!", "error");
+    return;
+  }
+
+  const gemsAmount = parseInt(document.getElementById("create-card-gems").value, 10);
+  if (isNaN(gemsAmount) || gemsAmount < 1) {
+    showToast("Please enter a valid amount of Gems (minimum 1).", "error");
+    return;
+  }
+
+  if ((currentUserProfile.gems || 0) < gemsAmount) {
+    showToast(`Insufficient Gems! You need ${gemsAmount} Gems. Your current balance: ${currentUserProfile.gems || 0} Gems.`, "error");
+    return;
+  }
+
+  const createBtn = document.getElementById("create-card-btn");
+  createBtn.disabled = true;
+  createBtn.innerText = "Creating Gift Card...";
+
+  try {
+    const code = generate5DigitCode();
+    const tier = getGiftCardTier(gemsAmount);
+    const userRef = db.collection("users").doc(currentUser.uid);
+    const cardRef = db.collection("gift_cards").doc();
+
+    await db.runTransaction(async (transaction) => {
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists) throw new Error("User document does not exist.");
+      const currentGems = userDoc.data().gems || 0;
+      if (currentGems < gemsAmount) throw new Error("Insufficient Gems balance!");
+
+      // Deduct gems from user profile
+      transaction.update(userRef, {
+        gems: currentGems - gemsAmount,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Save gift card document in Firestore
+      transaction.set(cardRef, {
+        code: code,
+        gems: gemsAmount,
+        tierName: tier.name,
+        tierKey: tier.key,
+        tierIcon: tier.icon,
+        creatorUid: currentUser.uid,
+        creatorEmail: currentUserProfile.email || "Unknown",
+        creatorUsername: currentUserProfile.mcUsername || "Player",
+        isRedeemed: false,
+        redeemedByUid: null,
+        redeemedByEmail: null,
+        redeemedByUsername: null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        redeemedAt: null
+      });
+    });
+
+    // Optimistically update header balance
+    if (userGemsCountEl) {
+      userGemsCountEl.innerText = Math.max(0, (currentUserProfile.gems || 0) - gemsAmount);
+    }
+
+    // Populate and open Gift Card Created Modal
+    document.getElementById("created-modal-code").innerText = code;
+    const badgeEl = document.getElementById("created-modal-tier-badge");
+    if (badgeEl) {
+      badgeEl.className = `tier-badge ${tier.key}`;
+      badgeEl.innerHTML = `${tier.icon} ${tier.name} Tier`;
+    }
+    const gemsBadgeEl = document.getElementById("created-modal-gems-badge");
+    if (gemsBadgeEl) gemsBadgeEl.innerText = `💎 ${gemsAmount} Gems`;
+
+    const copyBtn = document.getElementById("copy-card-code-btn");
+    if (copyBtn) {
+      copyBtn.onclick = () => {
+        navigator.clipboard.writeText(code);
+        showToast("Gift Card Code " + code + " copied to clipboard!", "success");
+      };
+    }
+
+    document.getElementById("create-gift-card-form").reset();
+    if (createCardTierBadge) {
+      createCardTierBadge.className = "tier-badge bronze";
+      createCardTierBadge.innerHTML = "🥉 Bronze Tier";
+    }
+
+    openModal(document.getElementById("card-created-modal"));
+    showToast(`Gift Card ${code} created successfully! ${gemsAmount} Gems deducted.`, "success");
+
+  } catch (err) {
+    console.error("Create gift card error:", err);
+    showToast(err.message || "Failed to create gift card.", "error");
+  } finally {
+    createBtn.disabled = false;
+    createBtn.innerText = "⚡ Create Gift Card & Deduct Gems";
+  }
+});
+
+// Redeem Gift Card Form Submission Handler
+document.getElementById("redeem-gift-card-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!currentUser || !currentUserProfile) {
+    openModal(authModal);
+    showToast("Please login to redeem a gift card!", "error");
+    return;
+  }
+
+  const codeInput = document.getElementById("redeem-card-code").value.trim();
+  if (!codeInput || codeInput.length !== 5 || isNaN(codeInput)) {
+    showToast("Please enter a valid 5-digit numeric gift card code.", "error");
+    return;
+  }
+
+  const redeemBtn = document.getElementById("redeem-card-btn");
+  redeemBtn.disabled = true;
+  redeemBtn.innerText = "Redeeming Code...";
+
+  try {
+    const cardQuery = await db.collection("gift_cards").where("code", "==", codeInput).limit(1).get();
+
+    if (cardQuery.empty) {
+      throw new Error("Invalid Gift Card Code! Please check the 5-digit code and try again.");
+    }
+
+    const cardDocSnap = cardQuery.docs[0];
+    const cardData = cardDocSnap.data();
+
+    if (cardData.isRedeemed) {
+      throw new Error("This Gift Card code has ALREADY been redeemed!");
+    }
+
+    const cardRef = cardDocSnap.ref;
+    const userRef = db.collection("users").doc(currentUser.uid);
+
+    await db.runTransaction(async (transaction) => {
+      const freshCardDoc = await transaction.get(cardRef);
+      if (!freshCardDoc.exists || freshCardDoc.data().isRedeemed) {
+        throw new Error("Gift Card code is invalid or already redeemed!");
+      }
+
+      const freshUserDoc = await transaction.get(userRef);
+      if (!freshUserDoc.exists) {
+        throw new Error("User profile not found.");
+      }
+
+      const currentGems = freshUserDoc.data().gems || 0;
+
+      // Update Card to redeemed
+      transaction.update(cardRef, {
+        isRedeemed: true,
+        redeemedByUid: currentUser.uid,
+        redeemedByEmail: currentUserProfile.email || "Unknown",
+        redeemedByUsername: currentUserProfile.mcUsername || "Player",
+        redeemedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Credit gems to redeeming user
+      transaction.update(userRef, {
+        gems: currentGems + cardData.gems,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    // Optimistically update header balance
+    if (userGemsCountEl) {
+      userGemsCountEl.innerText = (currentUserProfile.gems || 0) + cardData.gems;
+    }
+
+    // Populate and open Gift Card Redeemed Modal
+    const creatorEl = document.getElementById("redeemed-modal-creator");
+    if (creatorEl) creatorEl.innerText = cardData.creatorUsername || cardData.creatorEmail || "Unknown Player";
+    
+    const tier = getGiftCardTier(cardData.gems);
+    const tierBadge = document.getElementById("redeemed-modal-tier-badge");
+    if (tierBadge) {
+      tierBadge.className = `tier-badge ${tier.key}`;
+      tierBadge.innerHTML = `${tier.icon} ${tier.name} Tier`;
+    }
+    
+    const gemsModalEl = document.getElementById("redeemed-modal-gems");
+    if (gemsModalEl) gemsModalEl.innerText = `+${cardData.gems} Gems`;
+
+    document.getElementById("redeem-gift-card-form").reset();
+
+    openModal(document.getElementById("card-redeemed-modal"));
+    showToast(`Successfully redeemed Gift Card! +${cardData.gems} Gems added to your account! 🎉`, "success");
+
+  } catch (err) {
+    console.error("Redeem gift card error:", err);
+    showToast(err.message || "Failed to redeem gift card.", "error");
+  } finally {
+    redeemBtn.disabled = false;
+    redeemBtn.innerText = "🎉 Redeem Gift Card & Add Gems";
+  }
+});
+
 // Initialize Store Catalog on Page Load
 renderStoreItems();
+

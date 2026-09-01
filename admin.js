@@ -31,10 +31,12 @@ const pendingCountBadge = document.getElementById("pending-count-badge");
 let allUsersCache = [];
 let allPendingPurchases = [];
 let allCompletedPurchases = [];
+let allGiftCardsCache = [];
 
 // Real-time listener unsubscribers
 let usersUnsubscribe = null;
 let purchasesUnsubscribe = null;
+let giftCardsUnsubscribe = null;
 
 // Toast Helper
 function showToast(message, type = "info") {
@@ -133,16 +135,93 @@ adminPinForm?.addEventListener("submit", (e) => {
 function loadAdminDashboardData() {
   startUsersRealtimeListener();
   startPurchasesRealtimeListener();
+  startGiftCardsRealtimeListener();
 }
+
+// Admin Navigation Tabs & Mobile Dropdown Switching Handler
+const adminMobileTabBtn = document.getElementById("admin-mobile-tab-btn");
+const adminMobileTabMenu = document.getElementById("admin-mobile-tab-menu");
+const adminMobileCurrentTab = document.getElementById("admin-mobile-current-tab");
+
+// Mobile Dropdown Toggle Handler
+adminMobileTabBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (adminMobileTabMenu) {
+    adminMobileTabMenu.style.display = adminMobileTabMenu.style.display === "none" ? "flex" : "none";
+  }
+});
+
+// Close dropdown when clicking anywhere outside
+document.addEventListener("click", () => {
+  if (adminMobileTabMenu) adminMobileTabMenu.style.display = "none";
+});
+
+function switchAdminTab(targetTab, tabText) {
+  // Update desktop active buttons
+  document.querySelectorAll(".admin-tabs .tab-btn[data-admin-tab]").forEach(btn => {
+    if (btn.getAttribute("data-admin-tab") === targetTab) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+
+  // Update mobile active items
+  document.querySelectorAll(".mobile-tab-item[data-admin-tab]").forEach(item => {
+    if (item.getAttribute("data-admin-tab") === targetTab) {
+      item.classList.add("active");
+    } else {
+      item.classList.remove("active");
+    }
+  });
+
+  // Update mobile current tab label
+  if (adminMobileCurrentTab && tabText) {
+    adminMobileCurrentTab.innerText = tabText;
+  }
+
+  // Show target tab content section
+  document.querySelectorAll(".admin-tab-content").forEach(content => {
+    if (content.id === `admin-tab-${targetTab}`) {
+      content.style.display = "block";
+    } else {
+      content.style.display = "none";
+    }
+  });
+
+  // Close mobile dropdown menu
+  if (adminMobileTabMenu) adminMobileTabMenu.style.display = "none";
+}
+
+// Attach click listeners to desktop tab buttons
+document.querySelectorAll(".admin-tabs .tab-btn[data-admin-tab]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const targetTab = btn.getAttribute("data-admin-tab");
+    switchAdminTab(targetTab, btn.innerText.trim());
+  });
+});
+
+// Attach click listeners to mobile tab dropdown items
+document.querySelectorAll(".mobile-tab-item[data-admin-tab]").forEach(item => {
+  item.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const targetTab = item.getAttribute("data-admin-tab");
+    switchAdminTab(targetTab, item.innerText.trim());
+  });
+});
+
 
 // Refresh Data Button (re-subscribes listeners)
 document.getElementById("refresh-admin-data")?.addEventListener("click", () => {
+
   // Unsubscribe and resubscribe to force a fresh pull
   if (usersUnsubscribe) usersUnsubscribe();
   if (purchasesUnsubscribe) purchasesUnsubscribe();
+  if (giftCardsUnsubscribe) giftCardsUnsubscribe();
   loadAdminDashboardData();
   showToast("Live sync active — dashboard refreshed!", "info");
 });
+
 
 // Real-time Listener: Registered Users (auto-updates on add/delete from any source)
 function startUsersRealtimeListener() {
@@ -598,6 +677,216 @@ adminGemsForm?.addEventListener("submit", (e) => {
   adminGemsAmount.required = true;
 });
 
+// ==========================================================================
+// Admin Gift Cards Management Logic
+// ==========================================================================
+
+// Gift Card Tier Level Evaluator
+function getGiftCardTier(gems) {
+  const amount = parseInt(gems, 10) || 0;
+  if (amount >= 1 && amount <= 10) {
+    return { name: "Bronze", key: "bronze", icon: "🥉" };
+  } else if (amount >= 11 && amount <= 50) {
+    return { name: "Silver", key: "silver", icon: "🥈" };
+  } else if (amount >= 51 && amount <= 100) {
+    return { name: "Diamond", key: "diamond", icon: "💎" };
+  } else if (amount > 100) {
+    return { name: "Platinum", key: "platinum", icon: "👑" };
+  }
+  return { name: "Bronze", key: "bronze", icon: "🥉" };
+}
+
+// 5-Digit Random Code Generator
+function generate5DigitCode() {
+  return Math.floor(10000 + Math.random() * 90000).toString();
+}
+
+// Live Tier Preview in Admin Form
+const adminGiftcardGemsInput = document.getElementById("admin-giftcard-gems");
+const adminGiftcardTierBadge = document.getElementById("admin-giftcard-tier-badge");
+
+adminGiftcardGemsInput?.addEventListener("input", () => {
+  const gems = parseInt(adminGiftcardGemsInput.value, 10) || 0;
+  const tier = getGiftCardTier(gems);
+  if (adminGiftcardTierBadge) {
+    adminGiftcardTierBadge.className = `tier-badge ${tier.key}`;
+    adminGiftcardTierBadge.innerHTML = `${tier.icon} ${tier.name} Tier`;
+  }
+});
+
+// Admin Create Gift Card Handler
+document.getElementById("admin-giftcard-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const gems = parseInt(adminGiftcardGemsInput.value, 10);
+  if (isNaN(gems) || gems < 1) {
+    showToast("Please enter a valid Gems amount.", "error");
+    return;
+  }
+
+  try {
+    const code = generate5DigitCode();
+    const tier = getGiftCardTier(gems);
+
+    await db.collection("gift_cards").add({
+      code: code,
+      gems: gems,
+      tierName: tier.name,
+      tierKey: tier.key,
+      tierIcon: tier.icon,
+      creatorUid: "admin",
+      creatorEmail: "Admin Panel",
+      creatorUsername: "👑 Administrator",
+      isRedeemed: false,
+      redeemedByUid: null,
+      redeemedByEmail: null,
+      redeemedByUsername: null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      redeemedAt: null
+    });
+
+    showToast(`Successfully created Admin Gift Card Code [${code}] worth ${gems} Gems! (${tier.name} Tier)`, "success");
+    document.getElementById("admin-giftcard-form").reset();
+    if (adminGiftcardTierBadge) {
+      adminGiftcardTierBadge.className = "tier-badge bronze";
+      adminGiftcardTierBadge.innerHTML = "🥉 Bronze Tier";
+    }
+  } catch (err) {
+    console.error("Admin gift card creation error:", err);
+    showToast("Failed to create admin gift card.", "error");
+  }
+});
+
+// Real-time Listener for Gift Cards Directory
+function startGiftCardsRealtimeListener() {
+  if (giftCardsUnsubscribe) giftCardsUnsubscribe();
+
+  giftCardsUnsubscribe = db.collection("gift_cards").orderBy("createdAt", "desc").limit(200).onSnapshot((snapshot) => {
+    allGiftCardsCache = [];
+    snapshot.forEach(docSnap => {
+      allGiftCardsCache.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    triggerGiftCardsSearchFilter();
+  }, (err) => {
+    console.error("Error in gift cards real-time listener:", err);
+    showToast("Failed to sync gift cards directory.", "error");
+  });
+}
+
+// Render Gift Cards Table
+function renderGiftCardsTable(list) {
+  const tableBody = document.getElementById("giftcards-table-body");
+  if (!tableBody) return;
+  tableBody.innerHTML = "";
+
+  if (list.length === 0) {
+    tableBody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 24px;">No gift cards found.</td></tr>`;
+    return;
+  }
+
+  list.forEach(c => {
+    const tier = getGiftCardTier(c.gems);
+    const createdStr = c.createdAt ? new Date(c.createdAt.seconds * 1000).toLocaleString() : "Just now";
+    const redeemedStr = c.redeemedAt ? new Date(c.redeemedAt.seconds * 1000).toLocaleString() : "-";
+    const statusBadge = c.isRedeemed 
+      ? `<span style="color: var(--color-green); font-weight: 700; background: rgba(0, 230, 118, 0.1); border: 1px solid rgba(0,230,118,0.3); padding: 4px 8px; border-radius: 12px; font-size: 0.78rem;">✅ Redeemed</span>`
+      : `<span style="color: var(--color-gold); font-weight: 700; background: rgba(255, 215, 0, 0.1); border: 1px solid rgba(255,215,0,0.3); padding: 4px 8px; border-radius: 12px; font-size: 0.78rem;">⚡ Active</span>`;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><code style="font-family: monospace; font-size: 1.1rem; font-weight: 900; color: var(--color-cyan); background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 6px; letter-spacing: 2px;">${escapeHtml(c.code || 'N/A')}</code></td>
+      <td><strong style="color: var(--color-gold);">💎 ${c.gems || 0}</strong></td>
+      <td><span class="tier-badge ${tier.key}">${tier.icon} ${tier.name}</span></td>
+      <td><strong>${escapeHtml(c.creatorUsername || 'Player')}</strong> <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(c.creatorEmail || '')}</div></td>
+      <td>${statusBadge}</td>
+      <td>${c.isRedeemed ? `<strong style="color: var(--color-cyan);">${escapeHtml(c.redeemedByUsername || 'Player')}</strong>` : '<span style="color: var(--text-muted);">-</span>'}</td>
+      <td style="font-size: 0.78rem; color: var(--text-muted);">${createdStr}</td>
+      <td style="font-size: 0.78rem; color: var(--text-muted);">${redeemedStr}</td>
+      <td style="text-align: center;">
+        <button class="nav-btn btn-sm delete-card-btn" data-id="${c.id}" data-code="${escapeHtml(c.code || '')}" style="border-color: var(--color-danger); color: #fff; background-color: var(--color-danger); padding: 4px 10px; font-size: 0.75rem;">
+          🗑️ Delete
+        </button>
+      </td>
+    `;
+    tableBody.appendChild(tr);
+  });
+
+  // Attach delete listeners
+  document.querySelectorAll(".delete-card-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const docId = e.currentTarget.getAttribute("data-id");
+      const code = e.currentTarget.getAttribute("data-code");
+      deleteGiftCardDoc(docId, code);
+    });
+  });
+}
+
+// Search Filter for Gift Cards
+function triggerGiftCardsSearchFilter() {
+  const query = (document.getElementById("admin-search-giftcards")?.value || "").toLowerCase().trim();
+  if (!query) {
+    renderGiftCardsTable(allGiftCardsCache);
+    return;
+  }
+  const filtered = allGiftCardsCache.filter(c => {
+    const code = (c.code || "").toLowerCase();
+    const creator = (c.creatorUsername || "").toLowerCase();
+    const creatorEmail = (c.creatorEmail || "").toLowerCase();
+    const redeemer = (c.redeemedByUsername || "").toLowerCase();
+    return code.includes(query) || creator.includes(query) || creatorEmail.includes(query) || redeemer.includes(query);
+  });
+  renderGiftCardsTable(filtered);
+}
+
+document.getElementById("admin-search-giftcards")?.addEventListener("input", triggerGiftCardsSearchFilter);
+
+// Delete single Gift Card document from Firestore database
+async function deleteGiftCardDoc(docId, code) {
+  if (!docId) return;
+
+  const confirmDelete = confirm(`⚠️ Are you sure you want to PERMANENTLY DELETE Gift Card code [${code}] from the database?`);
+  if (!confirmDelete) return;
+
+  try {
+    await db.collection("gift_cards").doc(docId).delete();
+    showToast(`Gift card code [${code}] deleted from database! 🗑️`, "success");
+  } catch (err) {
+    console.error("Error deleting gift card:", err);
+    showToast("Failed to delete gift card.", "error");
+  }
+}
+
+// Delete ALL Gift Cards History from database
+document.getElementById("delete-all-giftcards-btn")?.addEventListener("click", async () => {
+  if (allGiftCardsCache.length === 0) {
+    showToast("No gift card history to delete.", "error");
+    return;
+  }
+
+  const confirmDelete = confirm(`⚠️ DANGER: Are you sure you want to PERMANENTLY DELETE ALL ${allGiftCardsCache.length} gift card records from the database? This action CANNOT be undone!`);
+  if (!confirmDelete) return;
+
+  const deleteBtn = document.getElementById("delete-all-giftcards-btn");
+  try {
+    deleteBtn.disabled = true;
+    deleteBtn.innerText = "Deleting...";
+
+    const batch = db.batch();
+    allGiftCardsCache.forEach(c => {
+      const docRef = db.collection("gift_cards").doc(c.id);
+      batch.delete(docRef);
+    });
+
+    await batch.commit();
+    showToast(`Successfully deleted ${allGiftCardsCache.length} gift card records from database! 🗑️`, "success");
+  } catch (err) {
+    console.error("Error deleting all gift cards:", err);
+    showToast("Failed to delete all gift card records.", "error");
+  } finally {
+    deleteBtn.disabled = false;
+    deleteBtn.innerText = "🗑️ Delete All Gift Cards History";
+  }
+});
+
 function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -609,3 +898,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Run immediate check
 checkAdminPinAuth();
+
