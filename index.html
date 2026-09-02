@@ -10,16 +10,53 @@
 </head>
 <body>
 
+  <!-- Sidebar Backdrop & Drawer (Matching Reference Image) -->
+  <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+  <aside id="sidebar-drawer" class="sidebar-drawer">
+    <div class="sidebar-header">
+      <a href="index.html" class="sidebar-brand">
+        <img src="assets/logo.png" alt="MOON Logo" class="sidebar-brand-logo">
+        <span class="sidebar-brand-text">MOON STORE</span>
+      </a>
+      <button id="sidebar-close-btn" class="sidebar-close-btn">&times;</button>
+    </div>
+
+    <nav class="sidebar-nav-menu">
+      <button class="sidebar-nav-item active" data-main-tab="store">
+        <span class="sidebar-nav-icon">🛒</span> Store Catalog
+      </button>
+      <button class="sidebar-nav-item" data-main-tab="debitcard">
+        <span class="sidebar-nav-icon">💳</span> Redeem Debit Card
+      </button>
+      <button class="sidebar-nav-item" data-main-tab="giftcards">
+        <span class="sidebar-nav-icon">🎁</span> Gift Cards
+      </button>
+      <button class="sidebar-nav-item" data-main-tab="receipts">
+        <span class="sidebar-nav-icon">🧾</span> Receipts History
+      </button>
+      <button class="sidebar-nav-item" data-main-tab="settings">
+        <span class="sidebar-nav-icon">⚙️</span> Settings & Saved Cards
+      </button>
+    </nav>
+
+    <div style="padding: 20px; border-top: 1px solid var(--border-light); font-size: 0.8rem; color: var(--text-dim); text-align: center;">
+      MOON Minecraft Server © 2026
+    </div>
+  </aside>
+
   <!-- Navigation Header -->
   <header>
     <div class="container navbar">
-      <a href="index.html" class="nav-brand">
-        <img src="assets/logo.png" alt="MOON Logo" class="brand-logo">
-        <span class="brand-text">MOON STORE</span>
-      </a>
+      <div style="display: flex; align-items: center;">
+        <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" title="Toggle Navigation Sidebar">≡</button>
+        <a href="index.html" class="nav-brand">
+          <img src="assets/logo.png" alt="MOON Logo" class="brand-logo">
+          <span class="brand-text">MOON STORE</span>
+        </a>
+      </div>
 
       <div class="nav-links">
-
 
         <!-- Logged Out View -->
         <div id="auth-logged-out" class="nav-links">
@@ -30,7 +67,6 @@
         <!-- Logged In View -->
         <div id="auth-logged-in" class="nav-links" style="display: none;">
 
-          
           <div class="user-profile-badge">
             <div class="gems-balance">
               <span class="gems-icon">💎</span>
@@ -61,7 +97,6 @@
           Enhance your survival experience with exclusive ExecutableItems Ranks, Phoenix Crate Keys, and Economy Coins. Powered by instant Gems dispatch!
         </p>
         <div class="hero-actions">
-
           <a href="#store-items" class="nav-btn btn-outline" style="padding: 14px 32px; font-size: 1.1rem;">
             🛒 Browse Store
           </a>
@@ -72,20 +107,100 @@
     <!-- Store Section -->
     <section id="store-items" class="store-section">
       <div class="section-header">
-        <h2 class="section-title">STORE CATALOG</h2>
+        <h2 id="main-section-title" class="section-title">STORE CATALOG</h2>
+      </div>
 
-        <div class="category-tabs">
-          <button class="tab-btn active" data-category="all">All Items</button>
-          <button class="tab-btn" data-category="coins">Server Coins</button>
-          <button class="tab-btn" data-category="ranks">Rank Books</button>
-          <button class="tab-btn" data-category="crates">Crate Keys</button>
-          <button class="tab-btn" data-category="giftcards">🎁 Gift Cards</button>
+      <!-- Store Catalog Section with Dedicated Sub-Sidebar Layout -->
+      <div id="catalog-tab-content" class="catalog-tab-content">
+        <div class="catalog-layout">
+          <!-- Catalog Sub Sidebar -->
+          <aside class="catalog-sub-sidebar">
+            <div class="sub-sidebar-title">🏷️ CATEGORIES</div>
+            <div class="sub-sidebar-menu">
+              <button class="sub-sidebar-btn active" data-category="all">
+                <span class="sub-icon">🌟</span> All Items
+              </button>
+              <button class="sub-sidebar-btn" data-category="ranks">
+                <span class="sub-icon">👑</span> Rank Books
+              </button>
+              <button class="sub-sidebar-btn" data-category="crates">
+                <span class="sub-icon">🔑</span> Crate Keys
+              </button>
+              <button class="sub-sidebar-btn" data-category="coins">
+                <span class="sub-icon">💰</span> Server Coins
+              </button>
+            </div>
+          </aside>
+
+          <!-- Store Catalog Items Grid -->
+          <div id="items-container" class="items-grid">
+            <!-- Rendered dynamically via app.js -->
+          </div>
         </div>
       </div>
 
-      <!-- Items Grid -->
-      <div id="items-container" class="items-grid">
-        <!-- Rendered dynamically via app.js -->
+      <!-- Redeem Gems from Debit Card Container -->
+      <div id="debit-card-container" class="gift-cards-wrapper" style="display: none;">
+        
+        <!-- Metallic Visual Debit Card Graphic -->
+        <div class="debit-card-box" style="grid-column: 1/-1;">
+          <div class="debit-card-graphic">
+            <div class="debit-card-chip"></div>
+            <div id="visual-card-number" class="debit-card-number-display">•••• •••• •••• ••••</div>
+            <div class="debit-card-meta">
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">CARD HOLDER PIN</div>
+                <div id="visual-card-pin" class="debit-card-pin-badge">PIN: ••••</div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">AVAILABLE BALANCE</div>
+                <div id="visual-card-gems" class="debit-card-gems-display">💎 -- GEMS</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Debit Card Verification & Redemption Form -->
+          <form id="debit-card-form" style="max-width: 650px; margin: 0 auto;">
+            <div class="form-group">
+              <label class="form-label" for="user-debit-card-number">16-Digit Debit Card Number</label>
+              <input type="text" id="user-debit-card-number" class="form-input" placeholder="e.g. 1234 5678 9012 3456" maxlength="19" required style="font-family: monospace; font-size: 1.25rem; letter-spacing: 2px;">
+              <small style="color: var(--text-muted); font-size: 0.8rem; display: block; margin-top: 4px;">
+                Spaces auto-insert every 4 digits while typing (16 digits total).
+              </small>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="user-debit-card-pin">3 or 4-Digit Card PIN</label>
+              <input type="password" id="user-debit-card-pin" class="form-input" placeholder="••••" maxlength="4" minlength="3" pattern="[0-9]{3,4}" required style="font-family: monospace; font-size: 1.5rem; letter-spacing: 8px; text-align: center; max-width: 200px;">
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+              <button type="button" id="check-card-balance-btn" class="nav-btn btn-outline" style="flex: 1; justify-content: center; padding: 14px;">
+                🔍 Check Card Gems Balance
+              </button>
+            </div>
+
+            <!-- Card Redemption Action (Visible after verifying card) -->
+            <div id="card-redeem-action-box" style="display: none; background: rgba(0, 240, 255, 0.05); border: 1px solid var(--border-cyan); padding: 20px; border-radius: 14px; margin-bottom: 20px;">
+              <div style="font-size: 0.9rem; font-weight: 700; color: var(--color-cyan); margin-bottom: 12px; text-transform: uppercase;">
+                ⚡ Redeem Gems to Your Website Wallet
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="redeem-gems-from-card-amount">Gems Amount to Redeem</label>
+                <div style="display: flex; gap: 10px;">
+                  <input type="number" id="redeem-gems-from-card-amount" class="form-input" min="1" placeholder="Enter gems amount" style="flex: 1;">
+                  <button type="button" id="redeem-all-card-gems-btn" class="nav-btn btn-gold" style="padding: 0 16px; font-size: 0.85rem;">
+                    MAX (All)
+                  </button>
+                </div>
+              </div>
+              <button type="submit" id="confirm-redeem-card-gems-btn" class="nav-btn btn-primary" style="width: 100%; justify-content: center; padding: 14px; font-size: 1rem;">
+                🎉 Transfer Gems from Debit Card to My Account
+              </button>
+            </div>
+          </form>
+        </div>
+
       </div>
 
       <!-- Gift Cards Container -->
@@ -129,7 +244,7 @@
           </form>
         </div>
 
-        <!-- Redeem Gift Card Box -->
+        <!-- Redeem Gift Card Box (With Destination Selector: Website Account vs Debit Card) -->
         <div class="gift-card-box">
           <div class="gift-card-box-header">
             <div class="gift-card-box-icon" style="border-color: var(--color-gold); background: rgba(255, 215, 0, 0.08);">🔑</div>
@@ -145,8 +260,35 @@
               <input type="text" id="redeem-card-code" class="form-input" placeholder="e.g. 49201" maxlength="5" pattern="[0-9]{5}" required style="font-family: monospace; font-size: 1.5rem; letter-spacing: 6px; text-align: center;">
             </div>
 
-            <div style="background: rgba(0, 240, 255, 0.05); border: 1px dashed var(--border-cyan); border-radius: 12px; padding: 14px; margin-bottom: 20px; text-align: center; font-size: 0.85rem; color: var(--text-muted);">
-              ℹ️ Each gift card code can be redeemed <strong style="color: #fff;">ONLY ONCE</strong> by any player on the store.
+            <!-- Target Account Destination Switcher -->
+            <div class="form-group">
+              <label class="form-label">Deposit Destination Account</label>
+              <div style="display: flex; gap: 12px; margin-top: 6px;">
+                <label style="flex: 1; background: rgba(255,255,255,0.03); border: 1px solid var(--border-cyan); padding: 10px 14px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #fff;">
+                  <input type="radio" name="giftcard-destination" value="user" checked>
+                  👤 My Website Account
+                </label>
+                <label style="flex: 1; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 10px 14px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #fff;">
+                  <input type="radio" name="giftcard-destination" value="debit">
+                  💳 Debit Card Account
+                </label>
+              </div>
+            </div>
+
+            <!-- Target Debit Card Fields (Hidden when Website Account is selected) -->
+            <div id="giftcard-debit-target-box" style="display: none; background: rgba(157, 78, 221, 0.08); border: 1px solid var(--border-purple); padding: 14px; border-radius: 12px; margin-bottom: 16px;">
+              <div class="form-group" style="margin-bottom: 10px;">
+                <label class="form-label" for="giftcard-debit-number" style="font-size: 0.8rem;">Target 16-Digit Debit Card Number</label>
+                <input type="text" id="giftcard-debit-number" class="form-input" placeholder="1234 5678 9012 3456" maxlength="19" style="font-family: monospace; font-size: 0.95rem;">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="giftcard-debit-pin" style="font-size: 0.8rem;">Debit Card 3 or 4-Digit PIN</label>
+                <input type="password" id="giftcard-debit-pin" class="form-input" placeholder="••••" maxlength="4" minlength="3" pattern="[0-9]{3,4}" style="font-family: monospace; font-size: 1.1rem; letter-spacing: 4px; max-width: 140px;">
+              </div>
+            </div>
+
+            <div style="background: rgba(0, 240, 255, 0.05); border: 1px dashed var(--border-cyan); border-radius: 12px; padding: 12px; margin-bottom: 20px; text-align: center; font-size: 0.82rem; color: var(--text-muted);">
+              ℹ️ Each gift card code can be redeemed <strong style="color: #fff;">ONLY ONCE</strong>.
             </div>
 
             <button type="submit" id="redeem-card-btn" class="nav-btn btn-gold" style="width: 100%; justify-content: center; padding: 14px; font-size: 1rem;">
@@ -156,8 +298,68 @@
         </div>
 
       </div>
-    </section>
 
+      <!-- Receipts Container -->
+      <div id="receipts-container" style="display: none;">
+        <div class="admin-card">
+          <h3 class="admin-card-title">🧾 YOUR TRANSACTIONS & RECEIPTS</h3>
+          <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 20px;">
+            History of your store purchases, gift card creations/redemptions, and debit card claims.
+          </p>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date & Time</th>
+                  <th>Transaction Description</th>
+                  <th>Gems Amount</th>
+                  <th>Target Player / Details</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="user-receipts-table-body">
+                <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading receipts...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings & Saved Cards Container -->
+      <div id="settings-container" style="display: none;">
+        <div class="admin-card" style="max-width: 800px; margin: 0 auto;">
+          <h3 class="admin-card-title">⚙️ SETTINGS & SAVED DEBIT CARDS</h3>
+          <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 24px;">
+            Manage your saved Debit Card credentials for quick gems redemption on MOON Store.
+          </p>
+
+          <!-- Add / Edit Saved Card Form -->
+          <form id="save-card-settings-form" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-cyan); padding: 20px; border-radius: 16px; margin-bottom: 24px;">
+            <h4 style="color: var(--color-cyan); font-size: 1.1rem; margin-bottom: 14px; font-family: var(--font-heading);">➕ Save New Debit Card</h4>
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 14px;">
+              <div>
+                <label class="form-label" for="setting-card-number">16-Digit Card Number</label>
+                <input type="text" id="setting-card-number" class="form-input" placeholder="1234 5678 9012 3456" maxlength="19" required style="font-family: monospace;">
+              </div>
+              <div>
+                <label class="form-label" for="setting-card-pin">3 or 4-Digit PIN</label>
+                <input type="password" id="setting-card-pin" class="form-input" placeholder="••••" maxlength="4" minlength="3" pattern="[0-9]{3,4}" required style="font-family: monospace; letter-spacing: 4px; text-align: center;">
+              </div>
+            </div>
+            <button type="submit" class="nav-btn btn-primary" style="padding: 10px 20px; font-size: 0.9rem;">
+              💾 Save Debit Card
+            </button>
+          </form>
+
+          <!-- Saved Cards List Grid -->
+          <h4 style="color: #fff; font-size: 1.1rem; margin-bottom: 14px; font-family: var(--font-heading);">💳 Your Saved Cards List</h4>
+          <div id="saved-cards-list-container" class="saved-cards-grid">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
+    </section>
 
   </main>
 

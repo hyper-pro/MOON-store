@@ -9,13 +9,60 @@
 </head>
 <body>
 
+  <!-- Sidebar Backdrop & Drawer (Matching Reference Design) -->
+  <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+  <aside id="sidebar-drawer" class="sidebar-drawer">
+    <div class="sidebar-header">
+      <a href="admin.html" class="sidebar-brand">
+        <img src="assets/logo.png" alt="MOON Logo" class="sidebar-brand-logo">
+        <span class="sidebar-brand-text">ADMIN PANEL</span>
+      </a>
+      <button id="sidebar-close-btn" class="sidebar-close-btn">&times;</button>
+    </div>
+
+    <nav class="sidebar-nav-menu">
+      <button class="sidebar-nav-item active" data-admin-tab="overview">
+        <span class="sidebar-nav-icon">📊</span> Quick Overview
+      </button>
+      <button class="sidebar-nav-item" data-admin-tab="gems">
+        <span class="sidebar-nav-icon">💎</span> Modify User Gems
+      </button>
+      <button class="sidebar-nav-item" data-admin-tab="debitcards">
+        <span class="sidebar-nav-icon">💳</span> Debit Cards Management
+      </button>
+      <button class="sidebar-nav-item" data-admin-tab="create-card">
+        <span class="sidebar-nav-icon">🎁</span> Create Gift Card
+      </button>
+      <button class="sidebar-nav-item" data-admin-tab="users">
+        <span class="sidebar-nav-icon">👥</span> Registered Players
+      </button>
+      <button class="sidebar-nav-item" data-admin-tab="pending">
+        <span class="sidebar-nav-icon">⏳</span> Pending Tasks
+      </button>
+      <button class="sidebar-nav-item" data-admin-tab="completed">
+        <span class="sidebar-nav-icon">✅</span> Completed Tasks
+      </button>
+      <button class="sidebar-nav-item" data-admin-tab="giftcards">
+        <span class="sidebar-nav-icon">🎁</span> Gift Cards Log
+      </button>
+    </nav>
+
+    <div style="padding: 20px; border-top: 1px solid var(--border-light); font-size: 0.8rem; color: var(--text-dim); text-align: center;">
+      MOON Server Admin © 2026
+    </div>
+  </aside>
+
   <!-- Navigation Header -->
   <header>
     <div class="container navbar">
-      <a href="index.html" class="nav-brand">
-        <img src="assets/logo.png" alt="MOON Logo" class="brand-logo">
-        <span class="brand-text">ADMIN PANEL</span>
-      </a>
+      <div style="display: flex; align-items: center;">
+        <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" title="Toggle Navigation Sidebar">≡</button>
+        <a href="index.html" class="nav-brand">
+          <img src="assets/logo.png" alt="MOON Logo" class="brand-logo">
+          <span class="brand-text">ADMIN PANEL</span>
+        </a>
+      </div>
 
       <div class="nav-links">
         <a href="index.html" class="nav-btn btn-outline">
@@ -86,34 +133,6 @@
       </div>
     </div>
 
-    <!-- Mobile Admin Tab Switcher Dropdown (Visible on Mobile/Tablet) -->
-    <div class="admin-mobile-tab-toggle">
-      <button id="admin-mobile-tab-btn" class="nav-btn btn-outline" style="width: 100%; justify-content: space-between; font-size: 0.95rem; padding: 12px 16px; border-color: var(--border-cyan); color: #fff; background: rgba(15, 23, 42, 0.8);">
-        <span id="admin-mobile-current-tab">📊 Quick Overview</span>
-        <span style="font-size: 0.8rem; color: var(--color-cyan);">▼ Switch Tab</span>
-      </button>
-      <div id="admin-mobile-tab-menu" class="admin-mobile-menu-dropdown" style="display: none;">
-        <button class="mobile-tab-item active" data-admin-tab="overview">📊 Quick Overview</button>
-        <button class="mobile-tab-item" data-admin-tab="gems">💎 Modify Gems</button>
-        <button class="mobile-tab-item" data-admin-tab="create-card">🎁 Create Gift Card</button>
-        <button class="mobile-tab-item" data-admin-tab="users">👥 Registered Players</button>
-        <button class="mobile-tab-item" data-admin-tab="pending">⏳ Pending Tasks</button>
-        <button class="mobile-tab-item" data-admin-tab="completed">✅ Completed Tasks</button>
-        <button class="mobile-tab-item" data-admin-tab="giftcards">🎁 Gift Cards Log</button>
-      </div>
-    </div>
-
-    <!-- Desktop Admin Navigation Tabs -->
-    <div class="category-tabs admin-tabs">
-      <button class="tab-btn active" data-admin-tab="overview">📊 Quick Overview</button>
-      <button class="tab-btn" data-admin-tab="gems">💎 Modify Gems</button>
-      <button class="tab-btn" data-admin-tab="create-card">🎁 Create Gift Card</button>
-      <button class="tab-btn" data-admin-tab="users">👥 Registered Players</button>
-      <button class="tab-btn" data-admin-tab="pending">⏳ Pending Tasks</button>
-      <button class="tab-btn" data-admin-tab="completed">✅ Completed Tasks</button>
-      <button class="tab-btn" data-admin-tab="giftcards">🎁 Gift Cards Log</button>
-    </div>
-
 
 
     <!-- Tab 1: Store Quick Overview -->
@@ -168,6 +187,98 @@
             ⚡ Update User Gems
           </button>
         </form>
+      </div>
+    </div>
+
+    <!-- Tab: Debit Cards Management -->
+    <div id="admin-tab-debitcards" class="admin-tab-content" style="display: none;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 30px;">
+        
+        <!-- Form: Create New Debit Card -->
+        <div class="admin-card">
+          <h3 class="admin-card-title">💳 CREATE NEW DEBIT CARD</h3>
+          <form id="admin-create-debitcard-form">
+            <div class="form-group">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label class="form-label" for="admin-debit-number">16-Digit Card Number</label>
+                <button type="button" id="admin-auto-gen-card-btn" class="nav-btn btn-outline btn-sm" style="font-size: 0.75rem; padding: 2px 8px;">🎲 Auto Generate</button>
+              </div>
+              <input type="text" id="admin-debit-number" class="form-input" placeholder="1234 5678 9012 3456" maxlength="19" required style="font-family: monospace; font-size: 0.95rem;">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="admin-debit-pin">3 or 4-Digit PIN Code</label>
+              <input type="text" id="admin-debit-pin" class="form-input" placeholder="e.g. 123 or 1234" maxlength="4" minlength="3" pattern="[0-9]{3,4}" required style="font-family: monospace; font-size: 1.1rem; letter-spacing: 4px; text-align: center; max-width: 170px;">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="admin-debit-gems">Initial Gems Amount</label>
+              <input type="number" id="admin-debit-gems" class="form-input" min="0" placeholder="e.g. 1000" required>
+            </div>
+
+            <button type="submit" class="nav-btn btn-primary" style="width: 100%; justify-content: center; padding: 12px;">
+              ⚡ Generate & Save Debit Card
+            </button>
+          </form>
+        </div>
+
+        <!-- Form: Debit Card Gems Operations -->
+        <div class="admin-card">
+          <h3 class="admin-card-title">💎 MODIFY DEBIT CARD GEMS</h3>
+          <form id="admin-debit-gems-form">
+            <div class="form-group">
+              <label class="form-label" for="admin-select-debit-card">Select Debit Card</label>
+              <select id="admin-select-debit-card" class="form-select" required>
+                <option value="">-- Select a Debit Card --</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="admin-debit-gems-action">Action Mode</label>
+              <select id="admin-debit-gems-action" class="form-select">
+                <option value="add">Add Gems to Card (+)</option>
+                <option value="remove">Remove Gems from Card (-)</option>
+                <option value="set">Set Exact Card Gems (=)</option>
+                <option value="reset">Reset Card Gems to 0 (Reset)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="admin-debit-gems-amount">Gems Amount</label>
+              <input type="number" id="admin-debit-gems-amount" class="form-input" min="0" placeholder="e.g. 500">
+            </div>
+
+            <button type="submit" class="nav-btn btn-gold" style="width: 100%; justify-content: center; padding: 12px;">
+              ⚡ Update Card Gems
+            </button>
+          </form>
+        </div>
+
+      </div>
+
+      <!-- Debit Cards Table Directory -->
+      <div class="admin-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <h3 class="admin-card-title" style="margin: 0;">💳 ACTIVE DEBIT CARDS DIRECTORY</h3>
+          <input type="text" id="admin-search-debitcards" class="form-input" placeholder="🔍 Search Card Number or PIN..." style="max-width: 300px; padding: 8px 12px; font-size: 0.85rem;">
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>16-Digit Card Number</th>
+                <th>3/4-Digit PIN</th>
+                <th>Gems Balance</th>
+                <th>Created Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="debitcards-table-body">
+              <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">Loading debit cards...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 

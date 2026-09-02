@@ -32,11 +32,13 @@ let allUsersCache = [];
 let allPendingPurchases = [];
 let allCompletedPurchases = [];
 let allGiftCardsCache = [];
+let allDebitCardsCache = [];
 
 // Real-time listener unsubscribers
 let usersUnsubscribe = null;
 let purchasesUnsubscribe = null;
 let giftCardsUnsubscribe = null;
+let debitCardsUnsubscribe = null;
 
 // Toast Helper
 function showToast(message, type = "info") {
@@ -91,7 +93,6 @@ function showAccessDenied(message = "") {
 }
 
 async function showAdminDashboard() {
-  // Ensure Firebase Auth session exists anonymously if user is not signed in
   if (!auth.currentUser) {
     try {
       await auth.signInAnonymously();
@@ -105,7 +106,6 @@ async function showAdminDashboard() {
   if (adminDashboardEl) adminDashboardEl.style.display = "block";
   if (adminUserBadge) adminUserBadge.style.display = "flex";
 
-  // Load Admin Data
   loadAdminDashboardData();
 }
 
@@ -136,88 +136,77 @@ function loadAdminDashboardData() {
   startUsersRealtimeListener();
   startPurchasesRealtimeListener();
   startGiftCardsRealtimeListener();
+  startDebitCardsRealtimeListener();
 }
 
-// Admin Navigation Tabs & Mobile Dropdown Switching Handler
-const adminMobileTabBtn = document.getElementById("admin-mobile-tab-btn");
-const adminMobileTabMenu = document.getElementById("admin-mobile-tab-menu");
-const adminMobileCurrentTab = document.getElementById("admin-mobile-current-tab");
+// ==========================================================================
+// Sidebar Drawer Navigation Controls
+// ==========================================================================
 
-// Mobile Dropdown Toggle Handler
-adminMobileTabBtn?.addEventListener("click", (e) => {
-  e.stopPropagation();
-  if (adminMobileTabMenu) {
-    adminMobileTabMenu.style.display = adminMobileTabMenu.style.display === "none" ? "flex" : "none";
+const sidebarDrawer = document.getElementById("sidebar-drawer");
+const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+const sidebarToggleBtn = document.getElementById("sidebar-toggle-btn");
+const sidebarCloseBtn = document.getElementById("sidebar-close-btn");
+
+function toggleSidebar(open) {
+  if (!sidebarDrawer) return;
+  const isDesktop = window.innerWidth >= 992;
+  const isOpen = open !== undefined ? open : !sidebarDrawer.classList.contains("open");
+
+  if (isOpen) {
+    sidebarDrawer.classList.add("open");
+    if (!isDesktop && sidebarBackdrop) sidebarBackdrop.classList.add("active");
+    if (isDesktop) document.body.classList.add("has-sidebar-open");
+  } else {
+    sidebarDrawer.classList.remove("open");
+    if (sidebarBackdrop) sidebarBackdrop.classList.remove("active");
+    document.body.classList.remove("has-sidebar-open");
   }
-});
+}
 
-// Close dropdown when clicking anywhere outside
-document.addEventListener("click", () => {
-  if (adminMobileTabMenu) adminMobileTabMenu.style.display = "none";
-});
+sidebarToggleBtn?.addEventListener("click", () => toggleSidebar());
+sidebarCloseBtn?.addEventListener("click", () => toggleSidebar(false));
+sidebarBackdrop?.addEventListener("click", () => toggleSidebar(false));
 
-function switchAdminTab(targetTab, tabText) {
-  // Update desktop active buttons
-  document.querySelectorAll(".admin-tabs .tab-btn[data-admin-tab]").forEach(btn => {
-    if (btn.getAttribute("data-admin-tab") === targetTab) {
-      btn.classList.add("active");
-    } else {
-      btn.classList.remove("active");
-    }
+function initResponsiveSidebar() {
+  if (window.innerWidth >= 992) {
+    toggleSidebar(true); // Open by default on Desktop
+  } else {
+    toggleSidebar(false); // Closed by default on Mobile
+  }
+}
+window.addEventListener("DOMContentLoaded", initResponsiveSidebar);
+
+// Admin Navigation Tabs Switching Handler (Sidebar-only)
+function switchAdminTab(targetTab) {
+  // Highlight active sidebar item
+  document.querySelectorAll(".sidebar-nav-item[data-admin-tab]").forEach(item => {
+    item.classList.toggle("active", item.getAttribute("data-admin-tab") === targetTab);
   });
 
-  // Update mobile active items
-  document.querySelectorAll(".mobile-tab-item[data-admin-tab]").forEach(item => {
-    if (item.getAttribute("data-admin-tab") === targetTab) {
-      item.classList.add("active");
-    } else {
-      item.classList.remove("active");
-    }
-  });
-
-  // Update mobile current tab label
-  if (adminMobileCurrentTab && tabText) {
-    adminMobileCurrentTab.innerText = tabText;
-  }
-
-  // Show target tab content section
+  // Show matching tab content, hide others
   document.querySelectorAll(".admin-tab-content").forEach(content => {
-    if (content.id === `admin-tab-${targetTab}`) {
-      content.style.display = "block";
-    } else {
-      content.style.display = "none";
-    }
+    content.style.display = content.id === `admin-tab-${targetTab}` ? "block" : "none";
   });
 
-  // Close mobile dropdown menu
-  if (adminMobileTabMenu) adminMobileTabMenu.style.display = "none";
+  // Close sidebar on mobile after navigating
+  if (window.innerWidth < 992) toggleSidebar(false);
 }
 
-// Attach click listeners to desktop tab buttons
-document.querySelectorAll(".admin-tabs .tab-btn[data-admin-tab]").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const targetTab = btn.getAttribute("data-admin-tab");
-    switchAdminTab(targetTab, btn.innerText.trim());
-  });
-});
-
-// Attach click listeners to mobile tab dropdown items
-document.querySelectorAll(".mobile-tab-item[data-admin-tab]").forEach(item => {
-  item.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const targetTab = item.getAttribute("data-admin-tab");
-    switchAdminTab(targetTab, item.innerText.trim());
+// Sidebar nav items — only source of navigation now
+document.querySelectorAll(".sidebar-nav-item[data-admin-tab]").forEach(item => {
+  item.addEventListener("click", () => {
+    switchAdminTab(item.getAttribute("data-admin-tab"));
   });
 });
 
 
-// Refresh Data Button (re-subscribes listeners)
+// Refresh Data Button
 document.getElementById("refresh-admin-data")?.addEventListener("click", () => {
-
-  // Unsubscribe and resubscribe to force a fresh pull
   if (usersUnsubscribe) usersUnsubscribe();
   if (purchasesUnsubscribe) purchasesUnsubscribe();
   if (giftCardsUnsubscribe) giftCardsUnsubscribe();
+  if (debitCardsUnsubscribe) debitCardsUnsubscribe();
   loadAdminDashboardData();
   showToast("Live sync active — dashboard refreshed!", "info");
 });
@@ -886,6 +875,291 @@ document.getElementById("delete-all-giftcards-btn")?.addEventListener("click", a
     deleteBtn.innerText = "🗑️ Delete All Gift Cards History";
   }
 });
+
+// Delete ALL Completed Tasks / Receipts History Handler
+document.getElementById("delete-all-completed-btn")?.addEventListener("click", async () => {
+  if (allCompletedPurchases.length === 0) {
+    showToast("No completed tasks or receipts to delete.", "error");
+    return;
+  }
+
+  const confirmDelete = confirm(`⚠️ DANGER: Are you sure you want to PERMANENTLY DELETE ALL ${allCompletedPurchases.length} completed receipts/tasks from the database? This action CANNOT be undone!`);
+  if (!confirmDelete) return;
+
+  const btn = document.getElementById("delete-all-completed-btn");
+  try {
+    btn.disabled = true;
+    btn.innerText = "Deleting...";
+
+    const batch = db.batch();
+    allCompletedPurchases.forEach(p => {
+      const docRef = db.collection("purchases").doc(p.id);
+      batch.delete(docRef);
+    });
+
+    await batch.commit();
+    showToast(`Successfully deleted ${allCompletedPurchases.length} completed receipts from database! 🗑️`, "success");
+  } catch (err) {
+    console.error("Error deleting completed tasks:", err);
+    showToast("Failed to delete completed task receipts.", "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerText = "🗑️ Delete All Completed Tasks Log";
+  }
+});
+
+// ==========================================================================
+// Debit Cards Management System (16-Digit Card Creation, Operations & Directory)
+// ==========================================================================
+
+function format16DigitCardNumber(value) {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 16);
+  const parts = [];
+  for (let i = 0; i < digits.length; i += 4) {
+    parts.push(digits.substring(i, i + 4));
+  }
+  return parts.join(' ');
+}
+
+function generate16DigitCardNumber() {
+  let result = "";
+  for (let i = 0; i < 16; i++) {
+    result += Math.floor(Math.random() * 10).toString();
+  }
+  return result;
+}
+
+// Auto format input listener on admin debit card creation field
+const adminDebitNumInput = document.getElementById("admin-debit-number");
+adminDebitNumInput?.addEventListener("input", (e) => {
+  e.target.value = format16DigitCardNumber(e.target.value);
+});
+
+// Auto Generate 16-digit number button listener
+document.getElementById("admin-auto-gen-card-btn")?.addEventListener("click", () => {
+  const genNum = generate16DigitCardNumber();
+  if (adminDebitNumInput) {
+    adminDebitNumInput.value = format16DigitCardNumber(genNum);
+  }
+});
+
+// Create New Debit Card Handler
+document.getElementById("admin-create-debitcard-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const rawNum = document.getElementById("admin-debit-number").value;
+  const cleanNum = rawNum.replace(/\s+/g, '');
+  const pin = document.getElementById("admin-debit-pin").value.trim();
+  const initialGems = parseInt(document.getElementById("admin-debit-gems").value, 10) || 0;
+
+  if (cleanNum.length !== 16 || isNaN(cleanNum)) {
+    showToast("Please enter a valid 16-digit numeric card number.", "error");
+    return;
+  }
+  if (!/^[0-9]{3,4}$/.test(pin)) {
+    showToast("Please enter a valid 3 or 4-digit numeric PIN code.", "error");
+    return;
+  }
+  if (isNaN(initialGems) || initialGems < 0) {
+    showToast("Please enter a valid initial Gems amount.", "error");
+    return;
+  }
+
+  try {
+    const existing = await db.collection("debit_cards").where("cardNumber", "==", cleanNum).limit(1).get();
+    if (!existing.empty) {
+      showToast("A debit card with this 16-digit card number already exists!", "error");
+      return;
+    }
+
+    await db.collection("debit_cards").add({
+      cardNumber: cleanNum,
+      pin: pin,
+      gems: initialGems,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    showToast(`Debit Card [${format16DigitCardNumber(cleanNum)}] created with ${initialGems} Gems!`, "success");
+    document.getElementById("admin-create-debitcard-form").reset();
+  } catch (err) {
+    console.error("Error creating debit card:", err);
+    showToast("Failed to create debit card.", "error");
+  }
+});
+
+// Real-time Listener for Debit Cards Directory & Select Dropdown
+function startDebitCardsRealtimeListener() {
+  if (debitCardsUnsubscribe) debitCardsUnsubscribe();
+
+  const selectEl = document.getElementById("admin-select-debit-card");
+
+  debitCardsUnsubscribe = db.collection("debit_cards").orderBy("createdAt", "desc").limit(200).onSnapshot((snapshot) => {
+    allDebitCardsCache = [];
+    if (selectEl) selectEl.innerHTML = `<option value="">-- Select a Debit Card --</option>`;
+
+    snapshot.forEach(docSnap => {
+      const card = { id: docSnap.id, ...docSnap.data() };
+      allDebitCardsCache.push(card);
+
+      if (selectEl) {
+        const opt = document.createElement("option");
+        opt.value = card.id;
+        opt.textContent = `${format16DigitCardNumber(card.cardNumber)} (PIN: ${card.pin}) - ${card.gems || 0} Gems`;
+        selectEl.appendChild(opt);
+      }
+    });
+
+    triggerDebitCardsSearchFilter();
+  }, (err) => {
+    console.error("Error in debit cards listener:", err);
+    showToast("Failed to sync debit cards directory.", "error");
+  });
+}
+
+// Modify Selected Debit Card Gems Form Handler
+document.getElementById("admin-debit-gems-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const docId = document.getElementById("admin-select-debit-card").value;
+  const action = document.getElementById("admin-debit-gems-action").value;
+  const amountInput = parseInt(document.getElementById("admin-debit-gems-amount").value, 10) || 0;
+
+  if (!docId) {
+    showToast("Please select a Debit Card to update.", "error");
+    return;
+  }
+
+  const cardRef = db.collection("debit_cards").doc(docId);
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const cardDoc = await transaction.get(cardRef);
+      if (!cardDoc.exists) throw new Error("Debit card document not found.");
+
+      const currentGems = cardDoc.data().gems || 0;
+      let newGems = currentGems;
+
+      if (action === "add") newGems += amountInput;
+      else if (action === "remove") newGems = Math.max(0, currentGems - amountInput);
+      else if (action === "set") newGems = amountInput;
+      else if (action === "reset") newGems = 0;
+
+      transaction.update(cardRef, {
+        gems: newGems,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    showToast(`Debit Card Gems updated successfully!`, "success");
+    document.getElementById("admin-debit-gems-amount").value = "";
+  } catch (err) {
+    console.error("Error updating debit card gems:", err);
+    showToast(err.message || "Failed to update card gems.", "error");
+  }
+});
+
+// Render Debit Cards Table Directory
+function renderDebitCardsTable(list) {
+  const tableBody = document.getElementById("debitcards-table-body");
+  if (!tableBody) return;
+  tableBody.innerHTML = "";
+
+  if (list.length === 0) {
+    tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">No debit cards found.</td></tr>`;
+    return;
+  }
+
+  list.forEach(c => {
+    const createdStr = c.createdAt ? new Date(c.createdAt.seconds * 1000).toLocaleString() : "Just now";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><code style="font-family: monospace; font-size: 0.95rem; font-weight: 700; color: var(--color-cyan); background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 6px; letter-spacing: 1px;">${format16DigitCardNumber(c.cardNumber)}</code></td>
+      <td><code style="font-family: monospace; font-size: 1.05rem; font-weight: 800; color: #fff; background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 4px; letter-spacing: 3px;">${escapeHtml(c.pin || '••••')}</code></td>
+      <td><strong style="color: var(--color-gold); font-size: 1.05rem;">💎 ${c.gems || 0}</strong></td>
+      <td style="font-size: 0.78rem; color: var(--text-muted);">${createdStr}</td>
+      <td>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button class="nav-btn btn-outline btn-sm add-quick-gems-btn" data-id="${c.id}" data-amount="100" style="padding: 2px 8px; font-size: 0.75rem;">+100 💎</button>
+          <button class="nav-btn btn-outline btn-sm reset-card-gems-btn" data-id="${c.id}" style="padding: 2px 8px; font-size: 0.75rem; border-color: var(--color-gold); color: var(--color-gold);">Reset 0 💎</button>
+          <button class="nav-btn btn-sm delete-debit-card-btn" data-id="${c.id}" data-cardnum="${escapeHtml(c.cardNumber || '')}" style="border-color: var(--color-danger); color: #fff; background-color: var(--color-danger); padding: 2px 8px; font-size: 0.75rem;">🗑️ Delete</button>
+        </div>
+      </td>
+    `;
+    tableBody.appendChild(tr);
+  });
+
+  // Attach table quick action listeners
+  document.querySelectorAll(".add-quick-gems-btn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      const id = e.currentTarget.getAttribute("data-id");
+      const amount = parseInt(e.currentTarget.getAttribute("data-amount"), 10);
+      try {
+        await db.collection("debit_cards").doc(id).update({
+          gems: firebase.firestore.FieldValue.increment(amount),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        showToast(`+${amount} Gems added to card!`, "success");
+      } catch (err) {
+        showToast("Failed to add gems.", "error");
+      }
+    });
+  });
+
+  document.querySelectorAll(".reset-card-gems-btn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      const id = e.currentTarget.getAttribute("data-id");
+      try {
+        await db.collection("debit_cards").doc(id).update({
+          gems: 0,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        showToast(`Card Gems balance reset to 0!`, "info");
+      } catch (err) {
+        showToast("Failed to reset card gems.", "error");
+      }
+    });
+  });
+
+  document.querySelectorAll(".delete-debit-card-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const docId = e.currentTarget.getAttribute("data-id");
+      const cardNum = e.currentTarget.getAttribute("data-cardnum");
+      deleteDebitCardDoc(docId, cardNum);
+    });
+  });
+}
+
+// Search Filter for Debit Cards Directory
+function triggerDebitCardsSearchFilter() {
+  const query = (document.getElementById("admin-search-debitcards")?.value || "").toLowerCase().replace(/\s+/g, '');
+  if (!query) {
+    renderDebitCardsTable(allDebitCardsCache);
+    return;
+  }
+  const filtered = allDebitCardsCache.filter(c => {
+    const num = (c.cardNumber || "").toLowerCase();
+    const pin = (c.pin || "").toLowerCase();
+    return num.includes(query) || pin.includes(query);
+  });
+  renderDebitCardsTable(filtered);
+}
+
+document.getElementById("admin-search-debitcards")?.addEventListener("input", triggerDebitCardsSearchFilter);
+
+// Delete Debit Card Document from Firestore
+async function deleteDebitCardDoc(docId, cardNumber) {
+  if (!docId) return;
+
+  const confirmDelete = confirm(`⚠️ Are you sure you want to PERMANENTLY DELETE Debit Card [${format16DigitCardNumber(cardNumber)}]?`);
+  if (!confirmDelete) return;
+
+  try {
+    await db.collection("debit_cards").doc(docId).delete();
+    showToast(`Debit Card deleted from database! 🗑️`, "success");
+  } catch (err) {
+    console.error("Error deleting debit card:", err);
+    showToast("Failed to delete debit card.", "error");
+  }
+}
 
 function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

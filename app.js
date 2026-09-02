@@ -990,7 +990,7 @@ document.getElementById("create-gift-card-form")?.addEventListener("submit", asy
   }
 });
 
-// Redeem Gift Card Form Submission Handler
+// Redeem Gift Card Form Submission Handler (Supports Website User or Debit Card destination)
 document.getElementById("redeem-gift-card-form")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!currentUser || !currentUserProfile) {
@@ -1003,6 +1003,36 @@ document.getElementById("redeem-gift-card-form")?.addEventListener("submit", asy
   if (!codeInput || codeInput.length !== 5 || isNaN(codeInput)) {
     showToast("Please enter a valid 5-digit numeric gift card code.", "error");
     return;
+  }
+
+  const destinationMode = document.querySelector('input[name="giftcard-destination"]:checked')?.value || "user";
+  let targetDebitDocSnap = null;
+
+  if (destinationMode === "debit") {
+    const rawNum = document.getElementById("giftcard-debit-number").value || "";
+    const cleanNum = rawNum.replace(/\s+/g, '');
+    const pin = document.getElementById("giftcard-debit-pin").value.trim();
+
+    if (cleanNum.length !== 26 || isNaN(cleanNum)) {
+      showToast("Please enter a valid 26-digit Debit Card number.", "error");
+      return;
+    }
+    if (pin.length !== 4 || isNaN(pin)) {
+      showToast("Please enter a valid 4-digit Debit Card PIN.", "error");
+      return;
+    }
+
+    const cardQuery = await db.collection("debit_cards")
+      .where("cardNumber", "==", cleanNum)
+      .where("pin", "==", pin)
+      .limit(1)
+      .get();
+
+    if (cardQuery.empty) {
+      showToast("Target Debit Card not found or invalid PIN!", "error");
+      return;
+    }
+    targetDebitDocSnap = cardQuery.docs[0];
   }
 
   const redeemBtn = document.getElementById("redeem-card-btn");
@@ -1023,44 +1053,62 @@ document.getElementById("redeem-gift-card-form")?.addEventListener("submit", asy
       throw new Error("This Gift Card code has ALREADY been redeemed!");
     }
 
-    const cardRef = cardDocSnap.ref;
+    const giftCardRef = cardDocSnap.ref;
     const userRef = db.collection("users").doc(currentUser.uid);
 
     await db.runTransaction(async (transaction) => {
-      const freshCardDoc = await transaction.get(cardRef);
-      if (!freshCardDoc.exists || freshCardDoc.data().isRedeemed) {
+      const freshGiftCardDoc = await transaction.get(giftCardRef);
+      if (!freshGiftCardDoc.exists || freshGiftCardDoc.data().isRedeemed) {
         throw new Error("Gift Card code is invalid or already redeemed!");
       }
 
-      const freshUserDoc = await transaction.get(userRef);
-      if (!freshUserDoc.exists) {
-        throw new Error("User profile not found.");
+      if (destinationMode === "debit" && targetDebitDocSnap) {
+        const freshDebitDoc = await transaction.get(targetDebitDocSnap.ref);
+        if (!freshDebitDoc.exists) throw new Error("Target Debit Card document does not exist.");
+
+        const currentDebitGems = freshDebitDoc.data().gems || 0;
+
+        // Mark gift card redeemed
+        transaction.update(giftCardRef, {
+          isRedeemed: true,
+          redeemedByUid: currentUser.uid,
+          redeemedByEmail: currentUserProfile.email || "Unknown",
+          redeemedByUsername: `${currentUserProfile.mcUsername || 'Player'} (To Debit Card)`,
+          redeemedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Credit gems to target debit card
+        transaction.update(targetDebitDocSnap.ref, {
+          gems: currentDebitGems + cardData.gems,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+      } else {
+        const freshUserDoc = await transaction.get(userRef);
+        if (!freshUserDoc.exists) throw new Error("User profile not found.");
+        const currentGems = freshUserDoc.data().gems || 0;
+
+        // Mark gift card redeemed
+        transaction.update(giftCardRef, {
+          isRedeemed: true,
+          redeemedByUid: currentUser.uid,
+          redeemedByEmail: currentUserProfile.email || "Unknown",
+          redeemedByUsername: currentUserProfile.mcUsername || "Player",
+          redeemedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Credit gems to user account
+        transaction.update(userRef, {
+          gems: currentGems + cardData.gems,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
       }
-
-      const currentGems = freshUserDoc.data().gems || 0;
-
-      // Update Card to redeemed
-      transaction.update(cardRef, {
-        isRedeemed: true,
-        redeemedByUid: currentUser.uid,
-        redeemedByEmail: currentUserProfile.email || "Unknown",
-        redeemedByUsername: currentUserProfile.mcUsername || "Player",
-        redeemedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-
-      // Credit gems to redeeming user
-      transaction.update(userRef, {
-        gems: currentGems + cardData.gems,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
     });
 
-    // Optimistically update header balance
-    if (userGemsCountEl) {
+    if (destinationMode === "user" && userGemsCountEl) {
       userGemsCountEl.innerText = (currentUserProfile.gems || 0) + cardData.gems;
     }
 
-    // Populate and open Gift Card Redeemed Modal
     const creatorEl = document.getElementById("redeemed-modal-creator");
     if (creatorEl) creatorEl.innerText = cardData.creatorUsername || cardData.creatorEmail || "Unknown Player";
     
@@ -1077,7 +1125,9 @@ document.getElementById("redeem-gift-card-form")?.addEventListener("submit", asy
     document.getElementById("redeem-gift-card-form").reset();
 
     openModal(document.getElementById("card-redeemed-modal"));
-    showToast(`Successfully redeemed Gift Card! +${cardData.gems} Gems added to your account! 🎉`, "success");
+    showToast(destinationMode === "debit" 
+      ? `Gift Card redeemed! +${cardData.gems} Gems credited directly to Debit Card!` 
+      : `Successfully redeemed Gift Card! +${cardData.gems} Gems added to your account! 🎉`, "success");
 
   } catch (err) {
     console.error("Redeem gift card error:", err);
@@ -1086,6 +1136,579 @@ document.getElementById("redeem-gift-card-form")?.addEventListener("submit", asy
     redeemBtn.disabled = false;
     redeemBtn.innerText = "🎉 Redeem Gift Card & Add Gems";
   }
+});
+
+// Destination Radio Switcher Listener
+document.querySelectorAll('input[name="giftcard-destination"]').forEach(radio => {
+  radio.addEventListener("change", (e) => {
+    const box = document.getElementById("giftcard-debit-target-box");
+    if (box) {
+      box.style.display = e.target.value === "debit" ? "block" : "none";
+    }
+  });
+});
+
+// Redeem Gift Card Form Submission Handler (Supports Website User or Debit Card destination)
+document.getElementById("redeem-gift-card-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!currentUser || !currentUserProfile) {
+    openModal(authModal);
+    showToast("Please login to redeem a gift card!", "error");
+    return;
+  }
+
+  const codeInput = document.getElementById("redeem-card-code").value.trim();
+  if (!codeInput || codeInput.length !== 5 || isNaN(codeInput)) {
+    showToast("Please enter a valid 5-digit numeric gift card code.", "error");
+    return;
+  }
+
+  const destinationMode = document.querySelector('input[name="giftcard-destination"]:checked')?.value || "user";
+  let targetDebitDocSnap = null;
+
+  if (destinationMode === "debit") {
+    const rawNum = document.getElementById("giftcard-debit-number").value || "";
+    const cleanNum = rawNum.replace(/\s+/g, '');
+    const pin = document.getElementById("giftcard-debit-pin").value.trim();
+
+    if (cleanNum.length !== 16 || isNaN(cleanNum)) {
+      showToast("Please enter a valid 16-digit Debit Card number.", "error");
+      return;
+    }
+    if (!/^[0-9]{3,4}$/.test(pin)) {
+      showToast("Please enter a valid 3 or 4-digit Debit Card PIN.", "error");
+      return;
+    }
+
+    const cardQuery = await db.collection("debit_cards")
+      .where("cardNumber", "==", cleanNum)
+      .where("pin", "==", pin)
+      .limit(1)
+      .get();
+
+    if (cardQuery.empty) {
+      showToast("Target Debit Card not found or invalid PIN!", "error");
+      return;
+    }
+    targetDebitDocSnap = cardQuery.docs[0];
+  }
+
+  const redeemBtn = document.getElementById("redeem-card-btn");
+  redeemBtn.disabled = true;
+  redeemBtn.innerText = "Redeeming Code...";
+
+  try {
+    const cardQuery = await db.collection("gift_cards").where("code", "==", codeInput).limit(1).get();
+
+    if (cardQuery.empty) {
+      throw new Error("Invalid Gift Card Code! Please check the 5-digit code and try again.");
+    }
+
+    const cardDocSnap = cardQuery.docs[0];
+    const cardData = cardDocSnap.data();
+
+    if (cardData.isRedeemed) {
+      throw new Error(`This Gift Card code was already redeemed on ${new Date(cardData.redeemedAt?.seconds * 1000).toLocaleDateString()}!`);
+    }
+
+    if (destinationMode === "debit") {
+      const debitRef = targetDebitDocSnap.ref;
+      const giftCardRef = cardDocSnap.ref;
+
+      await db.runTransaction(async (transaction) => {
+        const freshDebitDoc = await transaction.get(debitRef);
+        const freshGiftDoc = await transaction.get(giftCardRef);
+
+        if (!freshDebitDoc.exists) throw new Error("Target debit card no longer exists.");
+        if (freshGiftDoc.data().isRedeemed) throw new Error("Gift card already redeemed.");
+
+        const currentDebitGems = freshDebitDoc.data().gems || 0;
+
+        transaction.update(debitRef, {
+          gems: currentDebitGems + cardData.gems,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        transaction.update(giftCardRef, {
+          isRedeemed: true,
+          redeemedByUid: currentUser.uid,
+          redeemedByEmail: currentUserProfile.email || "Player",
+          redeemedByUsername: `${currentUserProfile.mcUsername || 'Player'} (Direct to Debit Card)`,
+          redeemedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+    } else {
+      const userRef = db.collection("users").doc(currentUser.uid);
+      const giftCardRef = cardDocSnap.ref;
+
+      await db.runTransaction(async (transaction) => {
+        const freshUserDoc = await transaction.get(userRef);
+        const freshGiftDoc = await transaction.get(giftCardRef);
+
+        if (!freshUserDoc.exists) throw new Error("User document no longer exists.");
+        if (freshGiftDoc.data().isRedeemed) throw new Error("Gift card already redeemed.");
+
+        const currentGems = freshUserDoc.data().gems || 0;
+
+        transaction.update(userRef, {
+          gems: currentGems + cardData.gems,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        transaction.update(giftCardRef, {
+          isRedeemed: true,
+          redeemedByUid: currentUser.uid,
+          redeemedByEmail: currentUserProfile.email || "Player",
+          redeemedByUsername: currentUserProfile.mcUsername || "Player",
+          redeemedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+
+      if (userGemsCountEl) {
+        userGemsCountEl.innerText = (currentUserProfile.gems || 0) + cardData.gems;
+      }
+    }
+    
+    const gemsModalEl = document.getElementById("redeemed-modal-gems");
+    if (gemsModalEl) gemsModalEl.innerText = `+${cardData.gems} Gems`;
+
+    document.getElementById("redeem-gift-card-form").reset();
+
+    openModal(document.getElementById("card-redeemed-modal"));
+    showToast(destinationMode === "debit" 
+      ? `Gift Card redeemed! +${cardData.gems} Gems credited directly to Debit Card!` 
+      : `Successfully redeemed Gift Card! +${cardData.gems} Gems added to your account! 🎉`, "success");
+
+  } catch (err) {
+    console.error("Redeem gift card error:", err);
+    showToast(err.message || "Failed to redeem gift card.", "error");
+  } finally {
+    redeemBtn.disabled = false;
+    redeemBtn.innerText = "🎉 Redeem Gift Card & Add Gems";
+  }
+});
+
+// ==========================================================================
+// Sidebar Navigation & Drawer Switcher (Matching Design)
+// ==========================================================================
+
+const sidebarDrawer = document.getElementById("sidebar-drawer");
+const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+const sidebarToggleBtn = document.getElementById("sidebar-toggle-btn");
+const sidebarCloseBtn = document.getElementById("sidebar-close-btn");
+
+function toggleSidebar(open) {
+  if (!sidebarDrawer) return;
+  const isDesktop = window.innerWidth >= 992;
+  const isOpen = open !== undefined ? open : !sidebarDrawer.classList.contains("open");
+
+  if (isOpen) {
+    sidebarDrawer.classList.add("open");
+    if (!isDesktop && sidebarBackdrop) sidebarBackdrop.classList.add("active");
+    if (isDesktop) document.body.classList.add("has-sidebar-open");
+  } else {
+    sidebarDrawer.classList.remove("open");
+    if (sidebarBackdrop) sidebarBackdrop.classList.remove("active");
+    document.body.classList.remove("has-sidebar-open");
+  }
+}
+
+sidebarToggleBtn?.addEventListener("click", () => toggleSidebar());
+sidebarCloseBtn?.addEventListener("click", () => toggleSidebar(false));
+sidebarBackdrop?.addEventListener("click", () => toggleSidebar(false));
+
+function initResponsiveSidebar() {
+  if (window.innerWidth >= 992) {
+    toggleSidebar(true); // Open by default on Desktop
+  } else {
+    toggleSidebar(false); // Closed by default on Mobile
+  }
+}
+window.addEventListener("DOMContentLoaded", initResponsiveSidebar);
+
+// Sidebar Main Tab Switcher Handler
+function switchMainTab(targetTab) {
+  const titleEl = document.getElementById("main-section-title");
+  const catalogContentEl = document.getElementById("catalog-tab-content");
+  const debitEl = document.getElementById("debit-card-container");
+  const giftEl = document.getElementById("gift-cards-container");
+  const receiptsEl = document.getElementById("receipts-container");
+  const settingsEl = document.getElementById("settings-container");
+
+  if (catalogContentEl) catalogContentEl.style.display = "none";
+  if (debitEl) debitEl.style.display = "none";
+  if (giftEl) giftEl.style.display = "none";
+  if (receiptsEl) receiptsEl.style.display = "none";
+  if (settingsEl) settingsEl.style.display = "none";
+
+  document.querySelectorAll(".sidebar-nav-item[data-main-tab]").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-main-tab") === targetTab);
+  });
+
+  if (targetTab === "debitcard") {
+    if (debitEl) debitEl.style.display = "grid";
+    if (titleEl) titleEl.innerText = "REDEEM DEBIT CARD GEMS";
+  } else if (targetTab === "giftcards") {
+    if (giftEl) giftEl.style.display = "grid";
+    if (titleEl) titleEl.innerText = "GIFT CARDS SYSTEM";
+  } else if (targetTab === "receipts") {
+    if (receiptsEl) receiptsEl.style.display = "block";
+    if (titleEl) titleEl.innerText = "YOUR TRANSACTIONS & RECEIPTS";
+    loadUserReceipts();
+  } else if (targetTab === "settings") {
+    if (settingsEl) settingsEl.style.display = "block";
+    if (titleEl) titleEl.innerText = "SETTINGS & SAVED DEBIT CARDS";
+    renderSavedCardsList();
+  } else {
+    if (catalogContentEl) catalogContentEl.style.display = "block";
+    const itemsEl = document.getElementById("items-container");
+    if (itemsEl) itemsEl.style.display = "grid";
+    if (titleEl) titleEl.innerText = "STORE CATALOG";
+    currentCategoryFilter = targetTab || "all";
+    filterStoreCatalogCategory(currentCategoryFilter);
+  }
+
+  if (window.innerWidth < 992) {
+    toggleSidebar(false);
+  }
+}
+
+function filterStoreCatalogCategory(category) {
+  currentCategoryFilter = category;
+  document.querySelectorAll(".sub-sidebar-btn[data-category]").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-category") === category);
+  });
+  renderStoreItems();
+}
+
+document.querySelectorAll(".sidebar-nav-item[data-main-tab]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    switchMainTab(btn.getAttribute("data-main-tab"));
+  });
+});
+
+document.querySelectorAll(".sub-sidebar-btn[data-category]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const cat = btn.getAttribute("data-category");
+    filterStoreCatalogCategory(cat);
+  });
+});
+
+// ==========================================================================
+// 16-Digit Debit Card Formatting & Verification & Claims
+// ==========================================================================
+
+function format16DigitCardNumber(value) {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 16);
+  const parts = [];
+  for (let i = 0; i < digits.length; i += 4) {
+    parts.push(digits.substring(i, i + 4));
+  }
+  return parts.join(' ');
+}
+
+function attachCardInputFormatter(inputId) {
+  const input = document.getElementById(inputId);
+  input?.addEventListener("input", (e) => {
+    const formatted = format16DigitCardNumber(e.target.value);
+    e.target.value = formatted;
+  });
+}
+attachCardInputFormatter("user-debit-card-number");
+attachCardInputFormatter("giftcard-debit-number");
+attachCardInputFormatter("setting-card-number");
+
+let activeVerifiedDebitCardDoc = null;
+
+// Check Card Balance Handler
+document.getElementById("check-card-balance-btn")?.addEventListener("click", async () => {
+  const rawNum = document.getElementById("user-debit-card-number").value;
+  const cleanNum = rawNum.replace(/\s+/g, '');
+  const pin = document.getElementById("user-debit-card-pin").value.trim();
+
+  if (cleanNum.length !== 16 || isNaN(cleanNum)) {
+    showToast("Please enter a full 16-digit Debit Card number.", "error");
+    return;
+  }
+  if (!/^[0-9]{3,4}$/.test(pin)) {
+    showToast("Please enter a valid 3 or 4-digit Card PIN.", "error");
+    return;
+  }
+
+  try {
+    const snapshot = await db.collection("debit_cards")
+      .where("cardNumber", "==", cleanNum)
+      .where("pin", "==", pin)
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) {
+      activeVerifiedDebitCardDoc = null;
+      document.getElementById("card-redeem-action-box").style.display = "none";
+      document.getElementById("visual-card-number").innerText = "•••• •••• •••• ••••";
+      document.getElementById("visual-card-pin").innerText = "PIN: ••••";
+      document.getElementById("visual-card-gems").innerText = "💎 -- GEMS";
+      showToast("Invalid Debit Card Number or PIN code!", "error");
+      return;
+    }
+
+    activeVerifiedDebitCardDoc = snapshot.docs[0];
+    const cardData = activeVerifiedDebitCardDoc.data();
+
+    document.getElementById("visual-card-number").innerText = format16DigitCardNumber(cardData.cardNumber);
+    document.getElementById("visual-card-pin").innerText = `PIN: ${cardData.pin}`;
+    document.getElementById("visual-card-gems").innerText = `💎 ${cardData.gems || 0} GEMS`;
+    document.getElementById("card-redeem-action-box").style.display = "block";
+
+    saveDebitCardToSettings(cleanNum, pin);
+    showToast(`Debit Card verified! Balance: ${cardData.gems || 0} Gems available.`, "success");
+
+  } catch (err) {
+    console.error("Check debit card error:", err);
+    showToast("Failed to verify debit card.", "error");
+  }
+});
+
+// Redeem All Max Gems Button
+document.getElementById("redeem-all-card-gems-btn")?.addEventListener("click", () => {
+  if (!activeVerifiedDebitCardDoc) return;
+  const currentGems = activeVerifiedDebitCardDoc.data().gems || 0;
+  document.getElementById("redeem-gems-from-card-amount").value = currentGems;
+});
+
+// Confirm Redeem Gems from Debit Card Handler
+document.getElementById("debit-card-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!currentUser || !currentUserProfile) {
+    openModal(authModal);
+    showToast("Please login to redeem Gems from a Debit Card!", "error");
+    return;
+  }
+
+  if (!activeVerifiedDebitCardDoc) {
+    showToast("Please verify your Debit Card balance first!", "error");
+    return;
+  }
+
+  const redeemAmount = parseInt(document.getElementById("redeem-gems-from-card-amount").value, 10);
+  if (isNaN(redeemAmount) || redeemAmount < 1) {
+    showToast("Please enter a valid amount of Gems to redeem.", "error");
+    return;
+  }
+
+  const confirmBtn = document.getElementById("confirm-redeem-card-gems-btn");
+  confirmBtn.disabled = true;
+  confirmBtn.innerText = "Transferring Gems...";
+
+  try {
+    const cardRef = activeVerifiedDebitCardDoc.ref;
+    const userRef = db.collection("users").doc(currentUser.uid);
+    const purchaseRef = db.collection("purchases").doc();
+
+    await db.runTransaction(async (transaction) => {
+      const freshCardDoc = await transaction.get(cardRef);
+      if (!freshCardDoc.exists) throw new Error("Debit card document not found.");
+
+      const cardGems = freshCardDoc.data().gems || 0;
+      if (cardGems < redeemAmount) {
+        throw new Error(`Debit card only has ${cardGems} Gems available!`);
+      }
+
+      const freshUserDoc = await transaction.get(userRef);
+      if (!freshUserDoc.exists) throw new Error("User document not found.");
+
+      const userGems = freshUserDoc.data().gems || 0;
+
+      // Deduct gems from debit card
+      transaction.update(cardRef, {
+        gems: cardGems - redeemAmount,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Credit gems to user
+      transaction.update(userRef, {
+        gems: userGems + redeemAmount,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Record receipt in purchases
+      transaction.set(purchaseRef, {
+        buyerUid: currentUser.uid,
+        buyerEmail: currentUserProfile.email || "Player",
+        targetUsername: currentUserProfile.mcUsername || "Player",
+        itemTitle: `Debit Card Gems Claim (${format16DigitCardNumber(freshCardDoc.data().cardNumber)})`,
+        costGems: redeemAmount,
+        commandToRun: `gems add ${currentUserProfile.mcUsername} ${redeemAmount}`,
+        status: "completed",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        completedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    if (userGemsCountEl) {
+      userGemsCountEl.innerText = (currentUserProfile.gems || 0) + redeemAmount;
+    }
+
+    const updatedCardSnap = await cardRef.get();
+    activeVerifiedDebitCardDoc = updatedCardSnap;
+    const updatedGems = updatedCardSnap.data().gems || 0;
+
+    document.getElementById("visual-card-gems").innerText = `💎 ${updatedGems} GEMS`;
+    document.getElementById("redeem-gems-from-card-amount").value = "";
+
+    showToast(`Successfully transferred ${redeemAmount} Gems from Debit Card to your account! 🎉`, "success");
+
+  } catch (err) {
+    console.error("Redeem debit card gems error:", err);
+    showToast(err.message || "Failed to redeem gems from debit card.", "error");
+  } finally {
+    confirmBtn.disabled = false;
+    confirmBtn.innerText = "🎉 Transfer Gems from Debit Card to My Account";
+  }
+});
+
+// ==========================================================================
+// User Receipts History Listener
+// ==========================================================================
+
+function loadUserReceipts() {
+  const tableBody = document.getElementById("user-receipts-table-body");
+  if (!tableBody) return;
+  if (!currentUser) {
+    tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">Please login to view your transaction receipts.</td></tr>`;
+    return;
+  }
+
+  db.collection("purchases")
+    .where("buyerEmail", "==", currentUserProfile?.email || currentUser.email)
+    .orderBy("createdAt", "desc")
+    .limit(50)
+    .onSnapshot((snapshot) => {
+      tableBody.innerHTML = "";
+      if (snapshot.empty) {
+        tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">No purchase receipts found.</td></tr>`;
+        return;
+      }
+
+      snapshot.forEach(docSnap => {
+        const r = docSnap.data();
+        const dateStr = r.createdAt ? new Date(r.createdAt.seconds * 1000).toLocaleString() : "Just now";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td style="font-size: 0.8rem; color: var(--text-muted);">${dateStr}</td>
+          <td><strong>${escapeHtml(r.itemTitle || 'Transaction')}</strong></td>
+          <td><strong style="color: var(--color-gold);">💎 ${r.costGems || 0}</strong></td>
+          <td><span style="color: var(--color-cyan);">${escapeHtml(r.targetUsername || 'Player')}</span></td>
+          <td><span style="color: var(--color-green); font-weight: 700;">✅ Completed</span></td>
+        `;
+        tableBody.appendChild(tr);
+      });
+    }, (err) => {
+      console.error("Error loading receipts:", err);
+    });
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ==========================================================================
+// Settings & Saved Cards Manager (LocalStorage)
+// ==========================================================================
+
+function getSavedDebitCards() {
+  try {
+    return JSON.parse(localStorage.getItem('moon_saved_debit_cards') || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveDebitCardToSettings(cardNumberClean, pin) {
+  let list = getSavedDebitCards();
+  list = list.filter(c => c.cardNumber !== cardNumberClean);
+  list.unshift({ cardNumber: cardNumberClean, pin: pin, savedAt: Date.now() });
+  localStorage.setItem('moon_saved_debit_cards', JSON.stringify(list));
+  renderSavedCardsList();
+}
+
+function deleteSavedDebitCard(index) {
+  let list = getSavedDebitCards();
+  list.splice(index, 1);
+  localStorage.setItem('moon_saved_debit_cards', JSON.stringify(list));
+  renderSavedCardsList();
+  showToast("Saved card removed from settings.", "info");
+}
+
+function renderSavedCardsList() {
+  const container = document.getElementById("saved-cards-list-container");
+  if (!container) return;
+  const list = getSavedDebitCards();
+  container.innerHTML = "";
+
+  if (list.length === 0) {
+    container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 20px;">No saved debit cards yet.</div>`;
+    return;
+  }
+
+  list.forEach((c, idx) => {
+    const cardEl = document.createElement("div");
+    cardEl.className = "saved-card-item";
+    cardEl.innerHTML = `
+      <div class="saved-card-number">${format16DigitCardNumber(c.cardNumber)}</div>
+      <div class="saved-card-pin">PIN: ${c.pin}</div>
+      <div style="display: flex; gap: 8px; margin-top: 12px;">
+        <button class="nav-btn btn-outline btn-sm use-saved-card-btn" data-idx="${idx}" style="flex: 1; justify-content: center; font-size: 0.78rem;">
+          💳 Use to Redeem
+        </button>
+        <button class="nav-btn btn-outline btn-sm delete-saved-card-btn" data-idx="${idx}" style="border-color: var(--color-danger); color: var(--color-danger); font-size: 0.78rem;">
+          🗑️
+        </button>
+      </div>
+    `;
+    container.appendChild(cardEl);
+  });
+
+  document.querySelectorAll(".use-saved-card-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const idx = parseInt(e.currentTarget.getAttribute("data-idx"), 10);
+      const card = list[idx];
+      if (!card) return;
+
+      document.getElementById("user-debit-card-number").value = format16DigitCardNumber(card.cardNumber);
+      document.getElementById("user-debit-card-pin").value = card.pin;
+      switchMainTab("debitcard");
+      document.getElementById("check-card-balance-btn")?.click();
+    });
+  });
+
+  document.querySelectorAll(".delete-saved-card-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const idx = parseInt(e.currentTarget.getAttribute("data-idx"), 10);
+      deleteSavedDebitCard(idx);
+    });
+  });
+}
+
+// Add/Save Card Settings Form Listener
+document.getElementById("save-card-settings-form")?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const rawNum = document.getElementById("setting-card-number").value;
+  const cleanNum = rawNum.replace(/\s+/g, '');
+  const pin = document.getElementById("setting-card-pin").value.trim();
+
+  if (cleanNum.length !== 16 || isNaN(cleanNum)) {
+    showToast("Please enter a 16-digit numeric card number.", "error");
+    return;
+  }
+  if (!/^[0-9]{3,4}$/.test(pin)) {
+    showToast("Please enter a 3 or 4-digit numeric PIN.", "error");
+    return;
+  }
+
+  saveDebitCardToSettings(cleanNum, pin);
+  document.getElementById("save-card-settings-form").reset();
+  showToast("Debit card credentials saved to settings!", "success");
 });
 
 // Initialize Store Catalog on Page Load
