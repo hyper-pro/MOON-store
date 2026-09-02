@@ -1418,6 +1418,90 @@ attachCardInputFormatter("user-debit-card-number");
 attachCardInputFormatter("giftcard-debit-number");
 attachCardInputFormatter("setting-card-number");
 
+// ==========================================================================
+// Saved Cards Autocomplete Suggestion Dropdown (Debit Card Redeem Form)
+// ==========================================================================
+
+function buildSavedCardsSuggestions() {
+  const dropdown = document.getElementById("saved-cards-suggestions");
+  const cardNumInput = document.getElementById("user-debit-card-number");
+  const cardPinInput = document.getElementById("user-debit-card-pin");
+  if (!dropdown) return;
+
+  const list = getSavedDebitCards();
+  dropdown.innerHTML = "";
+
+  if (list.length === 0) {
+    dropdown.innerHTML = `
+      <div class="saved-cards-suggestions-header">💳 Saved Cards</div>
+      <div class="saved-cards-suggestions-empty">No saved cards yet. Add one in Settings & Saved Cards.</div>
+    `;
+    dropdown.style.display = "block";
+    return;
+  }
+
+  const header = document.createElement("div");
+  header.className = "saved-cards-suggestions-header";
+  header.innerHTML = `💳 Your Saved Cards <span style="opacity:0.6;font-weight:400">(click to auto-fill)</span>`;
+  dropdown.appendChild(header);
+
+  list.forEach((c, idx) => {
+    const item = document.createElement("div");
+    item.className = "saved-card-suggestion-item";
+    item.tabIndex = 0;
+    item.innerHTML = `
+      <div class="suggestion-card-icon">💳</div>
+      <div class="suggestion-card-details">
+        <div class="suggestion-card-number">${format16DigitCardNumber(c.cardNumber)}</div>
+        <div class="suggestion-card-pin">PIN: ${"•".repeat(c.pin.length)} (${c.pin.length} digits)</div>
+      </div>
+      <div class="suggestion-card-action">↵ Use Card</div>
+    `;
+
+    const fillCard = () => {
+      if (cardNumInput) cardNumInput.value = format16DigitCardNumber(c.cardNumber);
+      if (cardPinInput) cardPinInput.value = c.pin;
+      dropdown.style.display = "none";
+      // Trigger balance check automatically after a tiny delay
+      setTimeout(() => {
+        document.getElementById("check-card-balance-btn")?.click();
+      }, 150);
+    };
+
+    item.addEventListener("click", fillCard);
+    item.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fillCard(); }
+    });
+
+    dropdown.appendChild(item);
+  });
+
+  dropdown.style.display = "block";
+}
+
+// Show suggestions on focus of card number input
+document.getElementById("user-debit-card-number")?.addEventListener("focus", () => {
+  buildSavedCardsSuggestions();
+});
+
+// Hide dropdown when clicking outside
+document.addEventListener("click", (e) => {
+  const dropdown = document.getElementById("saved-cards-suggestions");
+  const cardNumInput = document.getElementById("user-debit-card-number");
+  if (!dropdown) return;
+  if (!dropdown.contains(e.target) && e.target !== cardNumInput) {
+    dropdown.style.display = "none";
+  }
+});
+
+// Also hide on Escape
+document.getElementById("user-debit-card-number")?.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    const dropdown = document.getElementById("saved-cards-suggestions");
+    if (dropdown) dropdown.style.display = "none";
+  }
+});
+
 let activeVerifiedDebitCardDoc = null;
 
 // Check Card Balance Handler

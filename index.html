@@ -161,17 +161,19 @@
 
           <!-- Debit Card Verification & Redemption Form -->
           <form id="debit-card-form" style="max-width: 650px; margin: 0 auto;">
-            <div class="form-group">
+            <div class="form-group" style="position: relative;">
               <label class="form-label" for="user-debit-card-number">16-Digit Debit Card Number</label>
-              <input type="text" id="user-debit-card-number" class="form-input" placeholder="e.g. 1234 5678 9012 3456" maxlength="19" required style="font-family: monospace; font-size: 1.25rem; letter-spacing: 2px;">
+              <input type="text" id="user-debit-card-number" class="form-input" placeholder="e.g. 1234 5678 9012 3456" maxlength="19" required style="font-family: monospace; font-size: 1.25rem; letter-spacing: 2px;" autocomplete="off">
               <small style="color: var(--text-muted); font-size: 0.8rem; display: block; margin-top: 4px;">
                 Spaces auto-insert every 4 digits while typing (16 digits total).
               </small>
+              <!-- Saved Cards Suggestion Dropdown -->
+              <div id="saved-cards-suggestions" class="saved-cards-suggestions" style="display: none;"></div>
             </div>
 
             <div class="form-group">
               <label class="form-label" for="user-debit-card-pin">3 or 4-Digit Card PIN</label>
-              <input type="password" id="user-debit-card-pin" class="form-input" placeholder="••••" maxlength="4" minlength="3" pattern="[0-9]{3,4}" required style="font-family: monospace; font-size: 1.5rem; letter-spacing: 8px; text-align: center; max-width: 200px;">
+              <input type="password" id="user-debit-card-pin" class="form-input" placeholder="••••" maxlength="4" minlength="3" pattern="[0-9]{3,4}" required style="font-family: monospace; font-size: 1.5rem; letter-spacing: 8px; text-align: center; max-width: 200px;" autocomplete="off">
             </div>
 
             <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
