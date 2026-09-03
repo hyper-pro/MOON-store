@@ -137,6 +137,7 @@ function loadAdminDashboardData() {
   startPurchasesRealtimeListener();
   startGiftCardsRealtimeListener();
   startDebitCardsRealtimeListener();
+  initDebitCardInterestSettings();
 }
 
 // ==========================================================================
@@ -1172,4 +1173,196 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Run immediate check
 checkAdminPinAuth();
+
+// ==========================================================================
+// Debit Cards Bank Savings Interest System
+// ==========================================================================
+
+let currentInterestSettings = {
+  enabled: true,
+  ratePercent: 5,
+  interval: "daily",
+  lastAppliedAt: null
+};
+
+// Real-time / One-time Listener for Interest Settings
+function initDebitCardInterestSettings() {
+  db.collection("settings").doc("debit_card_interest").onSnapshot((docSnap) => {
+    if (docSnap.exists) {
+      currentInterestSettings = docSnap.data();
+      updateInterestUIFields();
+      checkAndApplyDebitCardInterest(false);
+    } else {
+      // Initialize default settings document in Firestore
+      const initialSettings = {
+        enabled: true,
+        ratePercent: 5,
+        interval: "daily",
+        lastAppliedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      db.collection("settings").doc("debit_card_interest").set(initialSettings).then(() => {
+        currentInterestSettings = { enabled: true, ratePercent: 5, interval: "daily", lastAppliedAt: Date.now() };
+        updateInterestUIFields();
+      });
+    }
+  }, (err) => {
+    console.error("Error loading interest settings:", err);
+  });
+}
+
+function updateInterestUIFields() {
+  const enableSwitch = document.getElementById("interest-enable-switch");
+  const rateInput = document.getElementById("interest-rate-input");
+  const intervalSelect = document.getElementById("interest-interval-select");
+  const statusBadge = document.getElementById("interest-status-badge");
+  const lastText = document.getElementById("last-interest-applied-text");
+  const nextText = document.getElementById("next-interest-due-text");
+
+  if (enableSwitch) enableSwitch.value = String(currentInterestSettings.enabled);
+  if (rateInput) rateInput.value = currentInterestSettings.ratePercent ?? 5;
+  if (intervalSelect) intervalSelect.value = currentInterestSettings.interval || "daily";
+
+  if (statusBadge) {
+    if (currentInterestSettings.enabled) {
+      statusBadge.innerText = `🟢 ACTIVE (${currentInterestSettings.ratePercent}% / ${currentInterestSettings.interval})`;
+      statusBadge.style.background = "rgba(0, 230, 118, 0.15)";
+      statusBadge.style.color = "var(--color-green)";
+      statusBadge.style.borderColor = "var(--color-green)";
+    } else {
+      statusBadge.innerText = `🔴 DISABLED`;
+      statusBadge.style.background = "rgba(255, 77, 77, 0.15)";
+      statusBadge.style.color = "var(--color-danger)";
+      statusBadge.style.borderColor = "var(--color-danger)";
+    }
+  }
+
+  // Format dates
+  const lastTs = currentInterestSettings.lastAppliedAt
+    ? (currentInterestSettings.lastAppliedAt.toMillis ? currentInterestSettings.lastAppliedAt.toMillis() : currentInterestSettings.lastAppliedAt)
+    : Date.now();
+
+  const intervalMs = (currentInterestSettings.interval === "weekly") ? (7 * 86400000) : 86400000;
+  const nextTs = lastTs + intervalMs;
+
+  if (lastText) lastText.innerText = new Date(lastTs).toLocaleString();
+  if (nextText) {
+    if (!currentInterestSettings.enabled) {
+      nextText.innerText = "Disabled";
+    } else if (Date.now() >= nextTs) {
+      nextText.innerText = "⚡ Due Now! (Auto calculating...)";
+    } else {
+      const hoursLeft = Math.ceil((nextTs - Date.now()) / (1000 * 60 * 60));
+      nextText.innerText = `Due in ~${hoursLeft} hour(s) (${new Date(nextTs).toLocaleString()})`;
+    }
+  }
+}
+
+// Calculate and Apply Interest to All Debit Cards
+async function checkAndApplyDebitCardInterest(forceManual = false) {
+  if (!currentInterestSettings || (!currentInterestSettings.enabled && !forceManual)) return;
+
+  const ratePercent = parseFloat(currentInterestSettings.ratePercent) || 0;
+  if (ratePercent <= 0) return;
+
+  const lastTs = currentInterestSettings.lastAppliedAt
+    ? (currentInterestSettings.lastAppliedAt.toMillis ? currentInterestSettings.lastAppliedAt.toMillis() : currentInterestSettings.lastAppliedAt)
+    : Date.now();
+
+  const intervalMs = (currentInterestSettings.interval === "weekly") ? (7 * 86400000) : 86400000;
+  const elapsedMs = Date.now() - lastTs;
+  let intervalsPassed = Math.floor(elapsedMs / intervalMs);
+
+  if (forceManual) {
+    intervalsPassed = Math.max(1, intervalsPassed);
+  }
+
+  if (intervalsPassed < 1) return; // Not due yet
+
+  try {
+    const snapshot = await db.collection("debit_cards").get();
+    if (snapshot.empty) {
+      await db.collection("settings").doc("debit_card_interest").update({
+        lastAppliedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      return;
+    }
+
+    const batch = db.batch();
+    let updatedCount = 0;
+    let totalInterestGems = 0;
+
+    snapshot.forEach(docSnap => {
+      const card = docSnap.data();
+      const currentGems = card.gems || 0;
+      if (currentGems > 0) {
+        // Compound interest growth per interval passed
+        const rateDecimal = ratePercent / 100;
+        const newGemsCalculated = Math.floor(currentGems * Math.pow(1 + rateDecimal, intervalsPassed));
+        const gainGems = Math.max(1, newGemsCalculated - currentGems);
+        const finalGems = currentGems + gainGems;
+
+        totalInterestGems += gainGems;
+        updatedCount++;
+
+        batch.update(docSnap.ref, {
+          gems: finalGems,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+    });
+
+    const newLastApplied = forceManual ? Date.now() : (lastTs + (intervalsPassed * intervalMs));
+    const settingsRef = db.collection("settings").doc("debit_card_interest");
+    batch.update(settingsRef, {
+      lastAppliedAt: firebase.firestore.Timestamp.fromMillis(newLastApplied)
+    });
+
+    await batch.commit();
+
+    if (updatedCount > 0) {
+      showToast(`🏦 Interest Paid! Added total 💎 ${totalInterestGems} Gems across ${updatedCount} debit card(s) (${ratePercent}% / ${currentInterestSettings.interval}).`, "success");
+    } else {
+      showToast(`Interest system checked: No active cards with Gems balance to credit.`, "info");
+    }
+
+  } catch (err) {
+    console.error("Error applying debit card interest:", err);
+    showToast("Failed to apply savings interest to debit cards.", "error");
+  }
+}
+
+// Save Interest Settings Form Event Handler
+document.getElementById("admin-debit-interest-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const enabled = document.getElementById("interest-enable-switch").value === "true";
+  const ratePercent = parseFloat(document.getElementById("interest-rate-input").value) || 0;
+  const interval = document.getElementById("interest-interval-select").value;
+
+  if (ratePercent <= 0) {
+    showToast("Please enter a valid positive interest rate percentage.", "error");
+    return;
+  }
+
+  try {
+    await db.collection("settings").doc("debit_card_interest").set({
+      enabled: enabled,
+      ratePercent: ratePercent,
+      interval: interval,
+      lastAppliedAt: currentInterestSettings.lastAppliedAt || firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    showToast("Debit Card Savings Interest Settings saved successfully! 🏦", "success");
+  } catch (err) {
+    console.error("Error saving interest settings:", err);
+    showToast("Failed to save interest settings.", "error");
+  }
+});
+
+// Apply Interest Now Button Handler
+document.getElementById("apply-interest-now-btn")?.addEventListener("click", () => {
+  const confirmApply = confirm(`🏦 Are you sure you want to apply interest payout to all debit cards NOW?\n\nRate: ${currentInterestSettings.ratePercent}%\nInterval: ${currentInterestSettings.interval}`);
+  if (confirmApply) {
+    checkAndApplyDebitCardInterest(true);
+  }
+});
 

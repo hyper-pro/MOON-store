@@ -21,6 +21,11 @@ service cloud.firestore {
     match /debit_cards/{cardId} {
       allow read, write: if true;
     }
+
+    // Rules for settings collection (allow read/write for interest config)
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
   }
 }
 

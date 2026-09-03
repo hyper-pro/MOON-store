@@ -279,13 +279,15 @@
 
             <!-- Target Debit Card Fields (Hidden when Website Account is selected) -->
             <div id="giftcard-debit-target-box" style="display: none; background: rgba(157, 78, 221, 0.08); border: 1px solid var(--border-purple); padding: 14px; border-radius: 12px; margin-bottom: 16px;">
-              <div class="form-group" style="margin-bottom: 10px;">
+              <div class="form-group" style="margin-bottom: 10px; position: relative;">
                 <label class="form-label" for="giftcard-debit-number" style="font-size: 0.8rem;">Target 16-Digit Debit Card Number</label>
-                <input type="text" id="giftcard-debit-number" class="form-input" placeholder="1234 5678 9012 3456" maxlength="19" style="font-family: monospace; font-size: 0.95rem;">
+                <input type="text" id="giftcard-debit-number" class="form-input" placeholder="1234 5678 9012 3456" maxlength="19" style="font-family: monospace; font-size: 0.95rem;" autocomplete="off">
+                <!-- Saved Cards Suggestion Dropdown for Gift Card Debit Target -->
+                <div id="giftcard-saved-cards-suggestions" class="saved-cards-suggestions" style="display: none;"></div>
               </div>
               <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label" for="giftcard-debit-pin" style="font-size: 0.8rem;">Debit Card 3 or 4-Digit PIN</label>
-                <input type="password" id="giftcard-debit-pin" class="form-input" placeholder="••••" maxlength="4" minlength="3" pattern="[0-9]{3,4}" style="font-family: monospace; font-size: 1.1rem; letter-spacing: 4px; max-width: 140px;">
+                <input type="password" id="giftcard-debit-pin" class="form-input" placeholder="••••" maxlength="4" minlength="3" pattern="[0-9]{3,4}" style="font-family: monospace; font-size: 1.1rem; letter-spacing: 4px; max-width: 140px;" autocomplete="off">
               </div>
             </div>
 

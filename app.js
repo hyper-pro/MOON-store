@@ -481,10 +481,12 @@ auth.onAuthStateChanged((user) => {
       }
     });
 
+    renderSavedCardsList();
   } else {
     currentUserProfile = null;
     authLoggedOutEl.style.display = "flex";
     authLoggedInEl.style.display = "none";
+    renderSavedCardsList();
 
     // Auto-login check on first load if not authenticated
     if (!hasCheckedAutoLogin) {
@@ -1419,13 +1421,13 @@ attachCardInputFormatter("giftcard-debit-number");
 attachCardInputFormatter("setting-card-number");
 
 // ==========================================================================
-// Saved Cards Autocomplete Suggestion Dropdown (Debit Card Redeem Form)
+// Saved Cards Autocomplete Suggestion Dropdown (Debit Card & Gift Card Target)
 // ==========================================================================
 
-function buildSavedCardsSuggestions() {
-  const dropdown = document.getElementById("saved-cards-suggestions");
-  const cardNumInput = document.getElementById("user-debit-card-number");
-  const cardPinInput = document.getElementById("user-debit-card-pin");
+function buildSavedCardsSuggestions(dropdownId = "saved-cards-suggestions", cardNumInputId = "user-debit-card-number", cardPinInputId = "user-debit-card-pin", autoCheckBalance = false) {
+  const dropdown = document.getElementById(dropdownId);
+  const cardNumInput = document.getElementById(cardNumInputId);
+  const cardPinInput = document.getElementById(cardPinInputId);
   if (!dropdown) return;
 
   const list = getSavedDebitCards();
@@ -1434,7 +1436,7 @@ function buildSavedCardsSuggestions() {
   if (list.length === 0) {
     dropdown.innerHTML = `
       <div class="saved-cards-suggestions-header">💳 Saved Cards</div>
-      <div class="saved-cards-suggestions-empty">No saved cards yet. Add one in Settings & Saved Cards.</div>
+      <div class="saved-cards-suggestions-empty">${!currentUser ? 'Please login to view your saved cards.' : 'No saved cards yet. Add one in Settings & Saved Cards.'}</div>
     `;
     dropdown.style.display = "block";
     return;
@@ -1445,7 +1447,7 @@ function buildSavedCardsSuggestions() {
   header.innerHTML = `💳 Your Saved Cards <span style="opacity:0.6;font-weight:400">(click to auto-fill)</span>`;
   dropdown.appendChild(header);
 
-  list.forEach((c, idx) => {
+  list.forEach((c) => {
     const item = document.createElement("div");
     item.className = "saved-card-suggestion-item";
     item.tabIndex = 0;
@@ -1462,10 +1464,11 @@ function buildSavedCardsSuggestions() {
       if (cardNumInput) cardNumInput.value = format16DigitCardNumber(c.cardNumber);
       if (cardPinInput) cardPinInput.value = c.pin;
       dropdown.style.display = "none";
-      // Trigger balance check automatically after a tiny delay
-      setTimeout(() => {
-        document.getElementById("check-card-balance-btn")?.click();
-      }, 150);
+      if (autoCheckBalance) {
+        setTimeout(() => {
+          document.getElementById("check-card-balance-btn")?.click();
+        }, 150);
+      }
     };
 
     item.addEventListener("click", fillCard);
@@ -1479,18 +1482,35 @@ function buildSavedCardsSuggestions() {
   dropdown.style.display = "block";
 }
 
-// Show suggestions on focus of card number input
-document.getElementById("user-debit-card-number")?.addEventListener("focus", () => {
-  buildSavedCardsSuggestions();
+// Show suggestions on focus and click of card number inputs
+const mainCardInput = document.getElementById("user-debit-card-number");
+mainCardInput?.addEventListener("focus", () => {
+  buildSavedCardsSuggestions("saved-cards-suggestions", "user-debit-card-number", "user-debit-card-pin", true);
+});
+mainCardInput?.addEventListener("click", () => {
+  buildSavedCardsSuggestions("saved-cards-suggestions", "user-debit-card-number", "user-debit-card-pin", true);
 });
 
-// Hide dropdown when clicking outside
+const giftcardDebitInput = document.getElementById("giftcard-debit-number");
+giftcardDebitInput?.addEventListener("focus", () => {
+  buildSavedCardsSuggestions("giftcard-saved-cards-suggestions", "giftcard-debit-number", "giftcard-debit-pin", false);
+});
+giftcardDebitInput?.addEventListener("click", () => {
+  buildSavedCardsSuggestions("giftcard-saved-cards-suggestions", "giftcard-debit-number", "giftcard-debit-pin", false);
+});
+
+// Hide dropdowns when clicking outside
 document.addEventListener("click", (e) => {
-  const dropdown = document.getElementById("saved-cards-suggestions");
-  const cardNumInput = document.getElementById("user-debit-card-number");
-  if (!dropdown) return;
-  if (!dropdown.contains(e.target) && e.target !== cardNumInput) {
-    dropdown.style.display = "none";
+  const dropdown1 = document.getElementById("saved-cards-suggestions");
+  const cardNumInput1 = document.getElementById("user-debit-card-number");
+  if (dropdown1 && !dropdown1.contains(e.target) && e.target !== cardNumInput1) {
+    dropdown1.style.display = "none";
+  }
+
+  const dropdown2 = document.getElementById("giftcard-saved-cards-suggestions");
+  const cardNumInput2 = document.getElementById("giftcard-debit-number");
+  if (dropdown2 && !dropdown2.contains(e.target) && e.target !== cardNumInput2) {
+    dropdown2.style.display = "none";
   }
 });
 
@@ -1501,8 +1521,68 @@ document.getElementById("user-debit-card-number")?.addEventListener("keydown", (
     if (dropdown) dropdown.style.display = "none";
   }
 });
+document.getElementById("giftcard-debit-number")?.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    const dropdown = document.getElementById("giftcard-saved-cards-suggestions");
+    if (dropdown) dropdown.style.display = "none";
+  }
+});
 
 let activeVerifiedDebitCardDoc = null;
+
+// Background Interest Calculation Check for Store Users
+async function checkBackgroundDebitCardInterest() {
+  try {
+    const docSnap = await db.collection("settings").doc("debit_card_interest").get();
+    if (!docSnap.exists) return;
+    const settings = docSnap.data();
+    if (!settings || !settings.enabled) return;
+
+    const ratePercent = parseFloat(settings.ratePercent) || 0;
+    if (ratePercent <= 0) return;
+
+    const lastTs = settings.lastAppliedAt
+      ? (settings.lastAppliedAt.toMillis ? settings.lastAppliedAt.toMillis() : settings.lastAppliedAt)
+      : Date.now();
+
+    const intervalMs = (settings.interval === "weekly") ? (7 * 86400000) : 86400000;
+    const elapsedMs = Date.now() - lastTs;
+    const intervalsPassed = Math.floor(elapsedMs / intervalMs);
+
+    if (intervalsPassed < 1) return; // Interest not due yet
+
+    // Apply interest to all cards
+    const snapshot = await db.collection("debit_cards").get();
+    if (snapshot.empty) return;
+
+    const batch = db.batch();
+    snapshot.forEach(d => {
+      const c = d.data();
+      const currentGems = c.gems || 0;
+      if (currentGems > 0) {
+        const rateDecimal = ratePercent / 100;
+        const newGemsCalculated = Math.floor(currentGems * Math.pow(1 + rateDecimal, intervalsPassed));
+        const gainGems = Math.max(1, newGemsCalculated - currentGems);
+        batch.update(d.ref, {
+          gems: currentGems + gainGems,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+    });
+
+    const newLastApplied = lastTs + (intervalsPassed * intervalMs);
+    batch.update(db.collection("settings").doc("debit_card_interest"), {
+      lastAppliedAt: firebase.firestore.Timestamp.fromMillis(newLastApplied)
+    });
+
+    await batch.commit();
+  } catch (e) {
+    console.warn("Background interest calculation check notice:", e);
+  }
+}
+
+// Check on page initialization
+checkBackgroundDebitCardInterest();
 
 // Check Card Balance Handler
 document.getElementById("check-card-balance-btn")?.addEventListener("click", async () => {
@@ -1518,6 +1598,9 @@ document.getElementById("check-card-balance-btn")?.addEventListener("click", asy
     showToast("Please enter a valid 3 or 4-digit Card PIN.", "error");
     return;
   }
+
+  // Ensure any pending interest is calculated before checking balance
+  await checkBackgroundDebitCardInterest();
 
   try {
     const snapshot = await db.collection("debit_cards")
@@ -1697,29 +1780,43 @@ function escapeHtml(str) {
 }
 
 // ==========================================================================
-// Settings & Saved Cards Manager (LocalStorage)
+// Settings & Saved Cards Manager (User Account Specific LocalStorage)
 // ==========================================================================
 
 function getSavedDebitCards() {
+  if (!currentUser || !currentUser.uid) {
+    return [];
+  }
   try {
-    return JSON.parse(localStorage.getItem('moon_saved_debit_cards') || '[]');
+    const userKey = `moon_saved_debit_cards_${currentUser.uid}`;
+    // Migration: If legacy global cards key exists, transfer it to active user account once
+    const legacyCards = localStorage.getItem('moon_saved_debit_cards');
+    if (legacyCards && !localStorage.getItem(userKey)) {
+      localStorage.setItem(userKey, legacyCards);
+      localStorage.removeItem('moon_saved_debit_cards');
+    }
+    return JSON.parse(localStorage.getItem(userKey) || '[]');
   } catch (e) {
     return [];
   }
 }
 
 function saveDebitCardToSettings(cardNumberClean, pin) {
+  if (!currentUser || !currentUser.uid) return;
+  const userKey = `moon_saved_debit_cards_${currentUser.uid}`;
   let list = getSavedDebitCards();
   list = list.filter(c => c.cardNumber !== cardNumberClean);
   list.unshift({ cardNumber: cardNumberClean, pin: pin, savedAt: Date.now() });
-  localStorage.setItem('moon_saved_debit_cards', JSON.stringify(list));
+  localStorage.setItem(userKey, JSON.stringify(list));
   renderSavedCardsList();
 }
 
 function deleteSavedDebitCard(index) {
+  if (!currentUser || !currentUser.uid) return;
+  const userKey = `moon_saved_debit_cards_${currentUser.uid}`;
   let list = getSavedDebitCards();
   list.splice(index, 1);
-  localStorage.setItem('moon_saved_debit_cards', JSON.stringify(list));
+  localStorage.setItem(userKey, JSON.stringify(list));
   renderSavedCardsList();
   showToast("Saved card removed from settings.", "info");
 }
@@ -1727,11 +1824,17 @@ function deleteSavedDebitCard(index) {
 function renderSavedCardsList() {
   const container = document.getElementById("saved-cards-list-container");
   if (!container) return;
+  
+  if (!currentUser) {
+    container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 20px;">Please login to view and manage your saved debit cards.</div>`;
+    return;
+  }
+
   const list = getSavedDebitCards();
   container.innerHTML = "";
 
   if (list.length === 0) {
-    container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 20px;">No saved debit cards yet.</div>`;
+    container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 20px;">No saved debit cards found for your account.</div>`;
     return;
   }
 
@@ -1777,6 +1880,13 @@ function renderSavedCardsList() {
 // Add/Save Card Settings Form Listener
 document.getElementById("save-card-settings-form")?.addEventListener("submit", (e) => {
   e.preventDefault();
+
+  if (!currentUser || !currentUser.uid) {
+    openModal(authModal);
+    showToast("Please login to save debit card credentials to your account!", "error");
+    return;
+  }
+
   const rawNum = document.getElementById("setting-card-number").value;
   const cleanNum = rawNum.replace(/\s+/g, '');
   const pin = document.getElementById("setting-card-pin").value.trim();
@@ -1792,7 +1902,7 @@ document.getElementById("save-card-settings-form")?.addEventListener("submit", (
 
   saveDebitCardToSettings(cleanNum, pin);
   document.getElementById("save-card-settings-form").reset();
-  showToast("Debit card credentials saved to settings!", "success");
+  showToast("Debit card credentials saved to your account settings!", "success");
 });
 
 // Initialize Store Catalog on Page Load
