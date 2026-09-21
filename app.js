@@ -76,7 +76,7 @@ const STORE_ITEMS = [
   // ================= Category: Crate Keys (from Poster 2) =================
   {
     id: "crate_rare",
-    title: "Rare Key",
+    title: "Gold Key",
     category: "crates",
     cost: 20, // 20 Gems from Poster
     theme: "cyan",
@@ -88,12 +88,12 @@ const STORE_ITEMS = [
       "🎁 Contains useful items",
       "⭐ Better loot, more chances!"
     ],
-    command: "pcrate giveKey rare_key {target_username}",
+    command: "dc givekey {target_username} gold physik 1",
     image: "assets/rare_key.png"
   },
   {
     id: "crate_epic",
-    title: "Epic Key",
+    title: "Amethyst Key",
     category: "crates",
     cost: 50, // 50 Gems from Poster
     theme: "purple",
@@ -105,12 +105,12 @@ const STORE_ITEMS = [
       "🎁 Better items & gear",
       "⭐ More value, more power!"
     ],
-    command: "pcrate giveKey epic_key {target_username}",
+    command: "dc givekey {target_username} amethyst physik 1",
     image: "assets/epic_key.png"
   },
   {
     id: "crate_legendary",
-    title: "Legendary Key",
+    title: "Crimson Key",
     category: "crates",
     cost: 100, // 100 Gems from Poster
     theme: "gold",
@@ -122,9 +122,27 @@ const STORE_ITEMS = [
       "🎁 Exclusive & rare items",
       "⭐ For the most dedicated!"
     ],
-    command: "pcrate giveKey legendary_key {target_username}",
+    command: "dc givekey {target_username} crimson physik 1",
     image: "assets/legendary_key.png"
   },
+  {
+    id: "crate_legendary",
+    title: "Prime Key",
+    category: "crates",
+    cost: 100, // 100 Gems from Poster
+    theme: "gold",
+    badge: "100 GEMS",
+    tagline: "OPEN LEGENDARY CRATES",
+    description: "The top-tier crate key! Guaranteed exclusive rewards and god-tier gear.",
+    perks: [
+      "🔹 Best rewards available",
+      "🎁 Exclusive & rare items",
+      "⭐ For the most dedicated!"
+    ],
+    command: "dc givekey {target_username} prime physik 1",
+    image: "assets/legendary_key.png"
+  },
+
 
   // ================= Category: Server Coins =================
   {
@@ -314,7 +332,7 @@ document.querySelectorAll(".category-tabs .tab-btn[data-category]").forEach(btn 
     document.querySelectorAll(".category-tabs .tab-btn[data-category]").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     currentCategoryFilter = btn.getAttribute("data-category") || "all";
-    
+
     const itemsContainerEl = document.getElementById("items-container");
     const giftCardsContainerEl = document.getElementById("gift-cards-container");
 
@@ -460,12 +478,12 @@ auth.onAuthStateChanged((user) => {
       } else {
         // If profile doesn't exist, check if we are registering or if it's a newly created account
         const timeSinceCreation = user.metadata ? (Date.now() - new Date(user.metadata.creationTime).getTime()) : 999999;
-        
+
         if (!isRegistering && timeSinceCreation > 15000) {
           console.warn("User document deleted from Firestore. Cleaning up Auth account.");
           localStorage.removeItem('moon_saved_email');
           localStorage.removeItem('moon_saved_password');
-          
+
           try {
             const userObj = auth.currentUser;
             if (userObj) {
@@ -565,7 +583,7 @@ loginForm?.addEventListener("submit", async (e) => {
 
   try {
     await auth.signInWithEmailAndPassword(email, password);
-    
+
     // Save credentials to localStorage for auto-login
     localStorage.setItem('moon_saved_email', email);
     localStorage.setItem('moon_saved_password', password);
@@ -611,7 +629,7 @@ document.getElementById("logout-btn")?.addEventListener("click", async () => {
     // Clear saved auto-login credentials
     localStorage.removeItem('moon_saved_email');
     localStorage.removeItem('moon_saved_password');
-    
+
     await auth.signOut();
     showToast("Logged out.", "info");
   } catch (err) {
@@ -1113,22 +1131,22 @@ document.getElementById("redeem-gift-card-form")?.addEventListener("submit", asy
 
     const creatorEl = document.getElementById("redeemed-modal-creator");
     if (creatorEl) creatorEl.innerText = cardData.creatorUsername || cardData.creatorEmail || "Unknown Player";
-    
+
     const tier = getGiftCardTier(cardData.gems);
     const tierBadge = document.getElementById("redeemed-modal-tier-badge");
     if (tierBadge) {
       tierBadge.className = `tier-badge ${tier.key}`;
       tierBadge.innerHTML = `${tier.icon} ${tier.name} Tier`;
     }
-    
+
     const gemsModalEl = document.getElementById("redeemed-modal-gems");
     if (gemsModalEl) gemsModalEl.innerText = `+${cardData.gems} Gems`;
 
     document.getElementById("redeem-gift-card-form").reset();
 
     openModal(document.getElementById("card-redeemed-modal"));
-    showToast(destinationMode === "debit" 
-      ? `Gift Card redeemed! +${cardData.gems} Gems credited directly to Debit Card!` 
+    showToast(destinationMode === "debit"
+      ? `Gift Card redeemed! +${cardData.gems} Gems credited directly to Debit Card!`
       : `Successfully redeemed Gift Card! +${cardData.gems} Gems added to your account! 🎉`, "success");
 
   } catch (err) {
@@ -1270,15 +1288,15 @@ document.getElementById("redeem-gift-card-form")?.addEventListener("submit", asy
         userGemsCountEl.innerText = (currentUserProfile.gems || 0) + cardData.gems;
       }
     }
-    
+
     const gemsModalEl = document.getElementById("redeemed-modal-gems");
     if (gemsModalEl) gemsModalEl.innerText = `+${cardData.gems} Gems`;
 
     document.getElementById("redeem-gift-card-form").reset();
 
     openModal(document.getElementById("card-redeemed-modal"));
-    showToast(destinationMode === "debit" 
-      ? `Gift Card redeemed! +${cardData.gems} Gems credited directly to Debit Card!` 
+    showToast(destinationMode === "debit"
+      ? `Gift Card redeemed! +${cardData.gems} Gems credited directly to Debit Card!`
       : `Successfully redeemed Gift Card! +${cardData.gems} Gems added to your account! 🎉`, "success");
 
   } catch (err) {
@@ -1824,7 +1842,7 @@ function deleteSavedDebitCard(index) {
 function renderSavedCardsList() {
   const container = document.getElementById("saved-cards-list-container");
   if (!container) return;
-  
+
   if (!currentUser) {
     container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 20px;">Please login to view and manage your saved debit cards.</div>`;
     return;
