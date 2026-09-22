@@ -126,7 +126,7 @@ const STORE_ITEMS = [
     image: "assets/legendary_key.png"
   },
   {
-    id: "crate_legendary",
+    id: "crate_prime", // Fixed: Unique ID for Prime Key
     title: "Prime Key",
     category: "crates",
     cost: 100, // 100 Gems from Poster
@@ -288,10 +288,8 @@ function renderStoreItems() {
         <img src="${item.image}" alt="${item.title}" class="item-image">
       </div>
       <div>
-        <h3 class="item-title">${item.title}</h3>
-        ${item.tagline ? `<div class="item-tagline">${item.tagline}</div>` : ''}
-        <p class="item-description">${item.description}</p>
-        ${perksHtml}
+        <h3 class="item-title">${item.title}</h3>${item.tagline ? `<div class="item-tagline">${item.tagline}</div>` : ''}
+        <p class="item-description">${item.description}</p>${perksHtml}
         <div class="item-command-tag" title="Executes via DiscordSRV/Console">
           📟 ${item.command}
         </div>
@@ -1007,154 +1005,6 @@ document.getElementById("create-gift-card-form")?.addEventListener("submit", asy
   } finally {
     createBtn.disabled = false;
     createBtn.innerText = "⚡ Create Gift Card & Deduct Gems";
-  }
-});
-
-// Redeem Gift Card Form Submission Handler (Supports Website User or Debit Card destination)
-document.getElementById("redeem-gift-card-form")?.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!currentUser || !currentUserProfile) {
-    openModal(authModal);
-    showToast("Please login to redeem a gift card!", "error");
-    return;
-  }
-
-  const codeInput = document.getElementById("redeem-card-code").value.trim();
-  if (!codeInput || codeInput.length !== 5 || isNaN(codeInput)) {
-    showToast("Please enter a valid 5-digit numeric gift card code.", "error");
-    return;
-  }
-
-  const destinationMode = document.querySelector('input[name="giftcard-destination"]:checked')?.value || "user";
-  let targetDebitDocSnap = null;
-
-  if (destinationMode === "debit") {
-    const rawNum = document.getElementById("giftcard-debit-number").value || "";
-    const cleanNum = rawNum.replace(/\s+/g, '');
-    const pin = document.getElementById("giftcard-debit-pin").value.trim();
-
-    if (cleanNum.length !== 26 || isNaN(cleanNum)) {
-      showToast("Please enter a valid 26-digit Debit Card number.", "error");
-      return;
-    }
-    if (pin.length !== 4 || isNaN(pin)) {
-      showToast("Please enter a valid 4-digit Debit Card PIN.", "error");
-      return;
-    }
-
-    const cardQuery = await db.collection("debit_cards")
-      .where("cardNumber", "==", cleanNum)
-      .where("pin", "==", pin)
-      .limit(1)
-      .get();
-
-    if (cardQuery.empty) {
-      showToast("Target Debit Card not found or invalid PIN!", "error");
-      return;
-    }
-    targetDebitDocSnap = cardQuery.docs[0];
-  }
-
-  const redeemBtn = document.getElementById("redeem-card-btn");
-  redeemBtn.disabled = true;
-  redeemBtn.innerText = "Redeeming Code...";
-
-  try {
-    const cardQuery = await db.collection("gift_cards").where("code", "==", codeInput).limit(1).get();
-
-    if (cardQuery.empty) {
-      throw new Error("Invalid Gift Card Code! Please check the 5-digit code and try again.");
-    }
-
-    const cardDocSnap = cardQuery.docs[0];
-    const cardData = cardDocSnap.data();
-
-    if (cardData.isRedeemed) {
-      throw new Error("This Gift Card code has ALREADY been redeemed!");
-    }
-
-    const giftCardRef = cardDocSnap.ref;
-    const userRef = db.collection("users").doc(currentUser.uid);
-
-    await db.runTransaction(async (transaction) => {
-      const freshGiftCardDoc = await transaction.get(giftCardRef);
-      if (!freshGiftCardDoc.exists || freshGiftCardDoc.data().isRedeemed) {
-        throw new Error("Gift Card code is invalid or already redeemed!");
-      }
-
-      if (destinationMode === "debit" && targetDebitDocSnap) {
-        const freshDebitDoc = await transaction.get(targetDebitDocSnap.ref);
-        if (!freshDebitDoc.exists) throw new Error("Target Debit Card document does not exist.");
-
-        const currentDebitGems = freshDebitDoc.data().gems || 0;
-
-        // Mark gift card redeemed
-        transaction.update(giftCardRef, {
-          isRedeemed: true,
-          redeemedByUid: currentUser.uid,
-          redeemedByEmail: currentUserProfile.email || "Unknown",
-          redeemedByUsername: `${currentUserProfile.mcUsername || 'Player'} (To Debit Card)`,
-          redeemedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        // Credit gems to target debit card
-        transaction.update(targetDebitDocSnap.ref, {
-          gems: currentDebitGems + cardData.gems,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-      } else {
-        const freshUserDoc = await transaction.get(userRef);
-        if (!freshUserDoc.exists) throw new Error("User profile not found.");
-        const currentGems = freshUserDoc.data().gems || 0;
-
-        // Mark gift card redeemed
-        transaction.update(giftCardRef, {
-          isRedeemed: true,
-          redeemedByUid: currentUser.uid,
-          redeemedByEmail: currentUserProfile.email || "Unknown",
-          redeemedByUsername: currentUserProfile.mcUsername || "Player",
-          redeemedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        // Credit gems to user account
-        transaction.update(userRef, {
-          gems: currentGems + cardData.gems,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      }
-    });
-
-    if (destinationMode === "user" && userGemsCountEl) {
-      userGemsCountEl.innerText = (currentUserProfile.gems || 0) + cardData.gems;
-    }
-
-    const creatorEl = document.getElementById("redeemed-modal-creator");
-    if (creatorEl) creatorEl.innerText = cardData.creatorUsername || cardData.creatorEmail || "Unknown Player";
-
-    const tier = getGiftCardTier(cardData.gems);
-    const tierBadge = document.getElementById("redeemed-modal-tier-badge");
-    if (tierBadge) {
-      tierBadge.className = `tier-badge ${tier.key}`;
-      tierBadge.innerHTML = `${tier.icon} ${tier.name} Tier`;
-    }
-
-    const gemsModalEl = document.getElementById("redeemed-modal-gems");
-    if (gemsModalEl) gemsModalEl.innerText = `+${cardData.gems} Gems`;
-
-    document.getElementById("redeem-gift-card-form").reset();
-
-    openModal(document.getElementById("card-redeemed-modal"));
-    showToast(destinationMode === "debit"
-      ? `Gift Card redeemed! +${cardData.gems} Gems credited directly to Debit Card!`
-      : `Successfully redeemed Gift Card! +${cardData.gems} Gems added to your account! 🎉`, "success");
-
-  } catch (err) {
-    console.error("Redeem gift card error:", err);
-    showToast(err.message || "Failed to redeem gift card.", "error");
-  } finally {
-    redeemBtn.disabled = false;
-    redeemBtn.innerText = "🎉 Redeem Gift Card & Add Gems";
   }
 });
 
@@ -1925,4 +1775,3 @@ document.getElementById("save-card-settings-form")?.addEventListener("submit", (
 
 // Initialize Store Catalog on Page Load
 renderStoreItems();
-
